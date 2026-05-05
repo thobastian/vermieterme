@@ -196,10 +196,4 @@ export interface AppUser {
   name: string | null;
   email: string | null;
   image?: string | null;
-  totpEnabled?: boolean;
-  totpVerified?: boolean;
-  mfaEnabled?: boolean;
-  mfaVerified?: boolean;
-  requires2FA?: boolean;
-  isTenant?: boolean;
 }

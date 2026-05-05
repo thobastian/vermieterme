@@ -1,5 +1,16 @@
 # 2FA Implementierung für VermieterMe
 
+> ⚠️ **Status: Geplantes Feature — nicht implementiert**
+>
+> Dieses Dokument beschreibt einen **früheren Implementierungsversuch**, der vor Release 1.0.8 wieder zurückgenommen wurde, weil er unfertig war (hardcoded Placeholder-PIN `"123456"`, fehlende Schema-Felder, nicht-funktionale Verifikation, Build-Fehler).
+>
+> Es dient als **Referenz für eine zukünftige saubere Implementierung**. Code-Verweise auf einzelne Files (`src/lib/totp.ts`, `src/app/api/auth/2fa/*`, etc.) sind veraltet — diese Dateien existieren im aktuellen Repo nicht mehr.
+>
+> Bei einer Neu-Implementierung beachten:
+> - Keine Placeholder-Verifikation in Production-Pfaden
+> - Schema-Felder (`mfaVerified` an Tenant, NextAuth-Type-Augmentations) konsistent zum Code
+> - End-to-End-Test mit echtem TOTP-Authenticator vor Merge
+
 ## Übersicht
 
 Diese Implementierung fügt Zweifaktor-Authentifizierung (2FA) für Benutzer und Mieter hinzu, basierend auf Next-Auth und TOTP.

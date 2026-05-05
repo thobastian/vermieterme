@@ -1,5 +1,9 @@
 # 2FA Database Migration
 
+> ⚠️ **Status: Geplantes Feature — nicht ausführen**
+>
+> Diese Migrations-Notiz gehört zu einem 2FA-Feature, das vor Release 1.0.8 zurückgenommen wurde. Erst wieder aktivieren, wenn 2FA sauber in einem eigenen Branch neu aufgebaut wird. Siehe [2FA_IMPLEMENTATION_SUMMARY.md](../../2FA_IMPLEMENTATION_SUMMARY.md).
+
 ## Changes
 
 ### User Model

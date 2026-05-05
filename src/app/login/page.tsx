@@ -77,10 +77,6 @@ function LoginForm() {
     if (result?.error) {
       setError("Ungültige Anmeldedaten");
       setLoading(false);
-    } else if (result?.requires2FA) {
-      // Redirect to 2FA verification
-      const isTenant = result.isTenant ? "true" : "false";
-      router.push(`/login/2fa?callbackUrl=${encodeURIComponent(callbackUrl)}&isTenant=${isTenant}`);
     } else {
       router.push(callbackUrl);
       router.refresh();

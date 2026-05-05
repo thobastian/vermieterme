@@ -1,5 +1,5 @@
 import { SignJWT, jwtVerify } from "jose";
-import { headers } from "next/next";
+import { headers } from "next/headers";
 import { ApiError } from "./api-utils";
 
 interface TenantTokenPayload {
@@ -40,25 +40,9 @@ export async function requireTenantAuth(): Promise<TenantTokenPayload> {
       throw new ApiError("Ungültiges Token", 401);
     }
 
-    // TODO: Verify tenant MFA status if enabled
-    // This would require checking the tenant's mfaVerified status
-    // and potentially requiring a fresh MFA verification
-
     return { tenantId, unitId };
   } catch (error) {
     if (error instanceof ApiError) throw error;
     throw new ApiError("Ungültiges oder abgelaufenes Token", 401);
-  }
-}
-
-// Verify tenant 2FA PIN
-export async function verifyTenant2FA(tenantId: string, pin: string): Promise<boolean> {
-  try {
-    // TODO: Implement actual 2FA verification with encrypted PIN
-    // For now, this is a placeholder
-    // In production, you would verify against an encrypted PIN stored in the database
-    return pin === "123456"; // Replace with actual verification
-  } catch (error) {
-    return false;
   }
 }

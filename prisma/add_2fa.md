@@ -1,5 +1,9 @@
 # 2FA Migration
 
+> ⚠️ **Status: Geplantes Feature — nicht ausführen**
+>
+> Diese Migration gehört zu einem 2FA-Feature, das vor Release 1.0.8 zurückgenommen wurde. Die Spalten dürfen erst hinzugefügt werden, wenn die zugehörige Code-Implementierung in einem eigenen Branch sauber neu aufgebaut wird. Siehe [2FA_IMPLEMENTATION_SUMMARY.md](../2FA_IMPLEMENTATION_SUMMARY.md).
+
 ## SQL Commands to Add 2FA Columns
 
 ### For User Table

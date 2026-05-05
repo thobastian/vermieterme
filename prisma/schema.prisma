@@ -17,11 +17,6 @@ model User {
   password      String?
   accounts      Account[]
   sessions      Session[]
-  // 2FA fields
-  totpEnabled   Boolean   @default(false)
-  totpSecret    String?
-  totpVerified  Boolean   @default(false)
-  backupCodes   String?   // JSON array of backup codes
 }
 
 model Account {
@@ -109,9 +104,6 @@ model Tenant {
   unit                Unit              @relation(fields: [unitId], references: [id], onDelete: Cascade)
   documents           Document[]
   accessToken         TenantAccessToken?
-  // 2FA fields
-  mfaEnabled          Boolean           @default(false)
-  mfaSessionToken     String?
   createdAt           DateTime          @default(now())
   updatedAt           DateTime          @updatedAt
 }
