@@ -3,14 +3,31 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
+import { EyeIcon, EyeOffIcon } from "lucide-react";
 import { Nav } from "@/components/nav";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { calculateMEAAmount, getMonthsInPeriod, getDaysInPeriod } from "@/lib/billing";
+import { DISTRIBUTION_KEYS } from "@/lib/constants";
 import { Loading } from "@/components/ui/loading";
 import { EmptyState } from "@/components/ui/empty-state";
 import { OptionalDateInput } from "@/components/ui/optional-date-input";
+import { Combobox } from "@/components/ui/combobox";
 import { DocumentUpload } from "@/components/document-upload";
 import type { BillingPeriodDetail, CostCategory, Tenant, UnitWithTenants } from "@/types";
+
+interface CostFormValue {
+  totalAmount: string;
+  unitAmount: string;
+  enabled: boolean;
+  distributionKeyOverride: string | null;
+}
+
+const DEFAULT_COST_VALUE: CostFormValue = {
+  totalAmount: "",
+  unitAmount: "",
+  enabled: true,
+  distributionKeyOverride: null,
+};
 
 export default function BillingDetailPage() {
   const params = useParams();
@@ -24,9 +41,9 @@ export default function BillingDetailPage() {
   const [saving, setSaving] = useState(false);
   const [saveStatus, setSaveStatus] = useState<string | null>(null);
 
-  const [costValues, setCostValues] = useState<
-    Record<string, { totalAmount: string; unitAmount: string }>
-  >({});
+  const [costValues, setCostValues] = useState<Record<string, CostFormValue>>(
+    {}
+  );
 
   const [prepaymentValues, setPrepaymentValues] = useState<
     Record<string, string>
@@ -45,14 +62,13 @@ export default function BillingDetailPage() {
         const bp: BillingPeriodDetail = await bpRes.json();
         setBillingPeriod(bp);
 
-        const costs: Record<
-          string,
-          { totalAmount: string; unitAmount: string }
-        > = {};
+        const costs: Record<string, CostFormValue> = {};
         bp.costs.forEach((cost) => {
           costs[cost.costCategoryId] = {
             totalAmount: cost.totalAmount.toString(),
             unitAmount: cost.unitAmount?.toString() || "",
+            enabled: cost.enabled !== false,
+            distributionKeyOverride: cost.distributionKeyOverride ?? null,
           };
         });
         setCostValues(costs);
@@ -98,12 +114,57 @@ export default function BillingDetailPage() {
     setCostValues((prev) => ({
       ...prev,
       [categoryId]: {
-        totalAmount: prev[categoryId]?.totalAmount || "",
-        unitAmount: prev[categoryId]?.unitAmount || "",
+        ...DEFAULT_COST_VALUE,
+        ...(prev[categoryId] ?? {}),
         [field]: value,
       },
     }));
     triggerAutoSave();
+  }
+
+  async function handleToggleCostEnabled(categoryId: string, enabled: boolean) {
+    const current = costValues[categoryId] ?? DEFAULT_COST_VALUE;
+    setCostValues((prev) => ({
+      ...prev,
+      [categoryId]: { ...current, enabled },
+    }));
+    try {
+      await fetch(`/api/billing-periods/${id}/costs`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          costCategoryId: categoryId,
+          enabled,
+        }),
+      });
+      await fetchData();
+    } catch (error) {
+      console.error("Failed to toggle cost:", error);
+    }
+  }
+
+  async function handleDistributionKeyOverride(
+    categoryId: string,
+    override: string | null
+  ) {
+    const current = costValues[categoryId] ?? DEFAULT_COST_VALUE;
+    setCostValues((prev) => ({
+      ...prev,
+      [categoryId]: { ...current, distributionKeyOverride: override },
+    }));
+    try {
+      await fetch(`/api/billing-periods/${id}/costs`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          costCategoryId: categoryId,
+          distributionKeyOverride: override,
+        }),
+      });
+      await fetchData();
+    } catch (error) {
+      console.error("Failed to update distribution key override:", error);
+    }
   }
 
   function handlePrepaymentChange(unitId: string, value: string) {
@@ -195,6 +256,7 @@ export default function BillingDetailPage() {
           costCategoryId,
           totalAmount: parseFloat(costVal.totalAmount) || 0,
           unitAmount: costVal.unitAmount ? parseFloat(costVal.unitAmount) : null,
+          reviewed: true,
         }),
       });
       if (res.ok) {
@@ -215,6 +277,7 @@ export default function BillingDetailPage() {
         body: JSON.stringify({
           unitId,
           monthlyAmount: parseFloat(val) || 0,
+          reviewed: true,
         }),
       });
       if (res.ok) {
@@ -230,9 +293,11 @@ export default function BillingDetailPage() {
     costCategories.forEach((cat) => {
       const costVal = costValues[cat.id];
       if (!costVal || !costVal.totalAmount) return;
+      if (costVal.enabled === false) return;
       const totalAmount = parseFloat(costVal.totalAmount) || 0;
+      const effectiveKey = costVal.distributionKeyOverride ?? cat.distributionKey;
 
-      if (cat.distributionKey === "MEA") {
+      if (effectiveKey === "MEA") {
         total += calculateMEAAmount(totalAmount, unit.shares, billingPeriod!.property.totalShares);
       } else {
         const unitAmount = costVal.unitAmount
@@ -303,9 +368,12 @@ export default function BillingDetailPage() {
   const monthsInPeriod = getMonthsInPeriod(billingPeriod.startDate, billingPeriod.endDate);
   const daysInPeriod = getDaysInPeriod(billingPeriod.startDate, billingPeriod.endDate);
 
-  const totalItems = billingPeriod.costs.length + billingPeriod.prepayments.length;
+  // Disabled cost positions are excluded from review tracking — they aren't
+  // part of this period's calculation, so they shouldn't show as "ungeprüft".
+  const activeCosts = billingPeriod.costs.filter((c) => c.enabled !== false);
+  const totalItems = activeCosts.length + billingPeriod.prepayments.length;
   const reviewedItems =
-    billingPeriod.costs.filter((c) => c.reviewed).length +
+    activeCosts.filter((c) => c.reviewed).length +
     billingPeriod.prepayments.filter((p) => p.reviewed).length;
   const allReviewed = totalItems > 0 && reviewedItems === totalItems;
 
@@ -448,10 +516,13 @@ export default function BillingDetailPage() {
               <table className="w-full">
                 <thead>
                   <tr className="border-b border-zinc-200 bg-zinc-50">
+                    <th className="w-12 px-2 py-3 text-center text-xs font-medium uppercase text-zinc-500">
+                      <span className="sr-only">Aktiv</span>
+                    </th>
                     <th className="px-4 py-3 text-left text-xs font-medium uppercase text-zinc-500">
                       Kostenart
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium uppercase text-zinc-500">
+                    <th className="w-56 px-4 py-3 text-left text-xs font-medium uppercase text-zinc-500">
                       Verteilerschlüssel
                     </th>
                     <th className="w-40 px-4 py-3 text-right text-xs font-medium uppercase text-zinc-500">
@@ -464,14 +535,14 @@ export default function BillingDetailPage() {
                 </thead>
                 <tbody className="divide-y divide-zinc-200">
                   {costCategories.map((cat) => {
-                    const costVal = costValues[cat.id] || {
-                      totalAmount: "",
-                      unitAmount: "",
-                    };
-                    const isMEA = cat.distributionKey === "MEA";
+                    const costVal = costValues[cat.id] || DEFAULT_COST_VALUE;
+                    const enabled = costVal.enabled !== false;
+                    const effectiveKey =
+                      costVal.distributionKeyOverride ?? cat.distributionKey;
+                    const isMEA = effectiveKey === "MEA";
                     const needsUnitAmount =
-                      cat.distributionKey === "laut Bescheid" ||
-                      cat.distributionKey === "siehe Anlage";
+                      effectiveKey === "laut Bescheid" ||
+                      effectiveKey === "siehe Anlage";
 
                     let meaDisplay = "";
                     if (isMEA && costVal.totalAmount && units.length > 0) {
@@ -489,20 +560,58 @@ export default function BillingDetailPage() {
                     }
 
                     const isUnreviewed =
-                      costReviewMap[cat.id] === false;
+                      enabled && costReviewMap[cat.id] === false;
+                    const overridden =
+                      costVal.distributionKeyOverride !== null &&
+                      costVal.distributionKeyOverride !== undefined;
+
+                    const distributionOptions = [
+                      {
+                        value: "__default__",
+                        label: `Standard (${cat.distributionKey})`,
+                      },
+                      ...DISTRIBUTION_KEYS.map((k) => ({
+                        value: k,
+                        label: k,
+                      })),
+                    ];
 
                     return (
                       <tr
                         key={cat.id}
                         className={
-                          isUnreviewed
-                            ? "border-l-4 border-amber-400 bg-amber-50/50"
-                            : ""
+                          !enabled
+                            ? "bg-zinc-50/60 text-zinc-400"
+                            : isUnreviewed
+                              ? "border-l-4 border-amber-400 bg-amber-50/50"
+                              : ""
                         }
                       >
-                        <td className="px-4 py-3 text-sm text-zinc-900">
+                        <td className="px-2 py-3 text-center">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              handleToggleCostEnabled(cat.id, !enabled)
+                            }
+                            title={
+                              enabled
+                                ? "In dieser Abrechnung ausblenden"
+                                : "In dieser Abrechnung einblenden"
+                            }
+                            className="rounded p-1 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600"
+                          >
+                            {enabled ? (
+                              <EyeIcon className="h-4 w-4" />
+                            ) : (
+                              <EyeOffIcon className="h-4 w-4" />
+                            )}
+                          </button>
+                        </td>
+                        <td className="px-4 py-3 text-sm">
                           <div className="flex items-center gap-2">
-                            {cat.name}
+                            <span className={!enabled ? "line-through" : ""}>
+                              {cat.name}
+                            </span>
                             {isUnreviewed && (
                               <button
                                 type="button"
@@ -514,8 +623,26 @@ export default function BillingDetailPage() {
                             )}
                           </div>
                         </td>
-                        <td className="px-4 py-3 text-sm text-zinc-600">
-                          {cat.distributionKey}
+                        <td className="px-4 py-3 text-sm">
+                          <Combobox
+                            options={distributionOptions}
+                            value={
+                              overridden
+                                ? costVal.distributionKeyOverride!
+                                : "__default__"
+                            }
+                            onChange={(v) =>
+                              handleDistributionKeyOverride(
+                                cat.id,
+                                v === "__default__" ? null : v
+                              )
+                            }
+                          />
+                          {overridden && (
+                            <p className="mt-1 text-xs text-amber-700">
+                              Abweichend (Standard: {cat.distributionKey})
+                            </p>
+                          )}
                         </td>
                         <td className="px-4 py-3 text-right">
                           <div className="flex justify-end">
@@ -523,6 +650,7 @@ export default function BillingDetailPage() {
                               type="number"
                               step="0.01"
                               value={costVal.totalAmount}
+                              disabled={!enabled}
                               onChange={(e) =>
                                 handleCostChange(
                                   cat.id,
@@ -531,7 +659,7 @@ export default function BillingDetailPage() {
                                 )
                               }
                               placeholder="0,00"
-                              className="w-32 rounded-lg border border-zinc-300 px-3 py-2 text-right text-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+                              className="w-32 rounded-lg border border-zinc-300 px-3 py-2 text-right text-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 disabled:bg-zinc-100 disabled:text-zinc-400"
                             />
                           </div>
                         </td>
@@ -542,6 +670,7 @@ export default function BillingDetailPage() {
                                 type="number"
                                 step="0.01"
                                 value={costVal.unitAmount}
+                                disabled={!enabled}
                                 onChange={(e) =>
                                   handleCostChange(
                                     cat.id,
@@ -550,7 +679,7 @@ export default function BillingDetailPage() {
                                   )
                                 }
                                 placeholder="0,00"
-                                className="w-32 rounded-lg border border-zinc-300 px-3 py-2 text-right text-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+                                className="w-32 rounded-lg border border-zinc-300 px-3 py-2 text-right text-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 disabled:bg-zinc-100 disabled:text-zinc-400"
                               />
                             </div>
                           ) : isMEA ? (

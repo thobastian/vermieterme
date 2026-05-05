@@ -1,0 +1,38 @@
+{
+  "expo": {
+    "name": "VermieterMe Mieter",
+    "slug": "vermieterme-mieter",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "scheme": "vermieterme-mieter",
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#b91c1c"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "me.vermieter.mieter"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#b91c1c",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "package": "me.vermieter.mieter"
+    },
+    "web": {
+      "favicon": "./assets/favicon.png",
+      "bundler": "metro"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      "expo-web-browser"
+    ]
+  }
+}

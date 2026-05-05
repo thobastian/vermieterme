@@ -11,6 +11,7 @@ import { OptionalDateInput } from "@/components/ui/optional-date-input";
 import { SALUTATIONS, SALUTATIONS_SECONDARY } from "@/lib/constants";
 import { validateIBAN, formatIBAN } from "@/lib/iban";
 import { DocumentUpload } from "@/components/document-upload";
+import { TenantAccessToken } from "@/components/tenant-access-token";
 import type { TenantWithUnit, PropertyWithUnits, RentChangeWithUnit } from "@/types";
 
 const leaseTypeOptions: ComboboxOption[] = [
@@ -29,6 +30,7 @@ export default function TenantsPage() {
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
   const [expandedTenant, setExpandedTenant] = useState<string | null>(null);
   const [adjustTarget, setAdjustTarget] = useState<string | null>(null);
+  const [accessTokenTarget, setAccessTokenTarget] = useState<string | null>(null);
   const [adjustForm, setAdjustForm] = useState({
     type: "prepayment" as "rent" | "prepayment",
     amount: "",
@@ -764,6 +766,16 @@ export default function TenantsPage() {
                                 {expandedTenant === tenant.id ? "Weniger" : "Dokumente"}
                               </button>
                               <button
+                                onClick={() =>
+                                  setAccessTokenTarget(
+                                    accessTokenTarget === tenant.id ? null : tenant.id
+                                  )
+                                }
+                                className="rounded-lg border border-zinc-300 px-3 py-1.5 text-xs font-medium text-zinc-700 hover:bg-zinc-50"
+                              >
+                                App-Zugang
+                              </button>
+                              <button
                                 onClick={() => startEdit(tenant)}
                                 className="rounded-lg border border-zinc-300 px-3 py-1.5 text-xs font-medium text-zinc-700 hover:bg-zinc-50"
                               >
@@ -859,6 +871,15 @@ export default function TenantsPage() {
                                 </button>
                               </div>
                             </div>
+                          )}
+
+                          {/* App-Zugang */}
+                          {accessTokenTarget === tenant.id && (
+                            <TenantAccessToken
+                              tenantId={tenant.id}
+                              tenantName={`${tenant.firstName} ${tenant.lastName}`}
+                              onClose={() => setAccessTokenTarget(null)}
+                            />
                           )}
 
                           {/* Mietvertrag-Upload */}

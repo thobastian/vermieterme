@@ -27,7 +27,30 @@ export function POST(
     await requireAuth();
     const { id } = await paramsPromise;
     const body = await request.json();
-    const { unitId, monthlyAmount } = body;
+    const { unitId, monthlyAmount, reviewed } = body;
+
+    // `reviewed` is only set when the client explicitly requests it (the
+    // "Bestätigen" action). A regular save must never silently mark
+    // unreviewed positions as reviewed.
+    const existing = await prisma.prepayment.findUnique({
+      where: {
+        billingPeriodId_unitId: {
+          billingPeriodId: id,
+          unitId,
+        },
+      },
+    });
+
+    let nextReviewed: boolean;
+    if (typeof reviewed === "boolean") {
+      nextReviewed = reviewed;
+    } else if (existing) {
+      // Editing an existing position invalidates a previous confirmation.
+      const valueChanged = existing.monthlyAmount !== monthlyAmount;
+      nextReviewed = valueChanged ? false : existing.reviewed;
+    } else {
+      nextReviewed = true;
+    }
 
     const prepayment = await prisma.prepayment.upsert({
       where: {
@@ -38,13 +61,13 @@ export function POST(
       },
       update: {
         monthlyAmount,
-        reviewed: true,
+        reviewed: nextReviewed,
       },
       create: {
         billingPeriodId: id,
         unitId,
         monthlyAmount,
-        reviewed: true,
+        reviewed: nextReviewed,
       },
     });
 

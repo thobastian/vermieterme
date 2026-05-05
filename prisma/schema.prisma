@@ -17,6 +17,11 @@ model User {
   password      String?
   accounts      Account[]
   sessions      Session[]
+  // 2FA fields
+  totpEnabled   Boolean   @default(false)
+  totpSecret    String?
+  totpVerified  Boolean   @default(false)
+  backupCodes   String?   // JSON array of backup codes
 }
 
 model Account {
@@ -101,10 +106,14 @@ model Tenant {
   indexReferenceValue  Float?
   indexReferenceDate   DateTime?
   indexMinMonths       Int        @default(12)
-  unit                Unit       @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  unit                Unit              @relation(fields: [unitId], references: [id], onDelete: Cascade)
   documents           Document[]
-  createdAt           DateTime   @default(now())
-  updatedAt           DateTime   @updatedAt
+  accessToken         TenantAccessToken?
+  // 2FA fields
+  mfaEnabled          Boolean           @default(false)
+  mfaSessionToken     String?
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
 }
 
 model CostCategory {
@@ -137,16 +146,21 @@ model BillingPeriod {
 }
 
 model Cost {
-  id              String        @id @default(cuid())
-  billingPeriodId String
-  costCategoryId  String
-  totalAmount     Float
-  unitAmount      Float?
-  reviewed        Boolean       @default(true)
-  billingPeriod   BillingPeriod @relation(fields: [billingPeriodId], references: [id], onDelete: Cascade)
-  costCategory    CostCategory  @relation(fields: [costCategoryId], references: [id], onDelete: Cascade)
-  createdAt       DateTime      @default(now())
-  updatedAt       DateTime      @updatedAt
+  id                      String        @id @default(cuid())
+  billingPeriodId         String
+  costCategoryId          String
+  totalAmount             Float
+  unitAmount              Float?
+  reviewed                Boolean       @default(true)
+  // Per-period overrides for the linked CostCategory. `enabled` hides this
+  // category from this billing period without deleting it. `distributionKeyOverride`
+  // replaces the category's default key for this period only (e.g. chimney
+  // sweep that switches from "MEA" to "siehe Anlage" in a specific year).
+  enabled                 Boolean       @default(true)
+  distributionKeyOverride String?
+  billingPeriod           BillingPeriod @relation(fields: [billingPeriodId], references: [id], onDelete: Cascade)
+  costCategory            CostCategory  @relation(fields: [costCategoryId], references: [id], onDelete: Cascade)
+  createdAt               DateTime      @default(now())
 
   @@unique([billingPeriodId, costCategoryId])
 }
@@ -160,7 +174,6 @@ model Prepayment {
   billingPeriod   BillingPeriod @relation(fields: [billingPeriodId], references: [id], onDelete: Cascade)
   unit            Unit          @relation(fields: [unitId], references: [id], onDelete: Cascade)
   createdAt       DateTime      @default(now())
-  updatedAt       DateTime      @updatedAt
 
   @@unique([billingPeriodId, unitId])
 }
@@ -211,6 +224,14 @@ model Document {
   billingPeriod   BillingPeriod? @relation(fields: [billingPeriodId], references: [id], onDelete: Cascade)
   tenant          Tenant?        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   createdAt       DateTime       @default(now())
+}
+
+model TenantAccessToken {
+  id        String   @id @default(cuid())
+  tenantId  String   @unique
+  token     String   @unique
+  createdAt DateTime @default(now())
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 }
 
 model LandlordInfo {

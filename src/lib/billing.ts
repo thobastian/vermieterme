@@ -1,4 +1,19 @@
-import type { BillingPeriodWithProperty, Cost, Prepayment } from "@/types";
+import type {
+  BillingPeriodWithProperty,
+  Cost,
+  CostCategory,
+  Prepayment,
+} from "@/types";
+
+// Per-period override (Cost.distributionKeyOverride) takes precedence over
+// the category default. Used wherever calculation or display needs the
+// effective key for a given billing period.
+export function effectiveDistributionKey(
+  cost: Pick<Cost, "distributionKeyOverride">,
+  category: Pick<CostCategory, "distributionKey">
+): string {
+  return cost.distributionKeyOverride ?? category.distributionKey;
+}
 
 export function getBillingStatus(bp: BillingPeriodWithProperty) {
   if (bp.paidDate) {
@@ -20,7 +35,10 @@ export function getUnreviewedCount(
   costs: Cost[],
   prepayments: Prepayment[]
 ): number {
-  const unreviewedCosts = costs.filter((c) => !c.reviewed).length;
+  // Disabled positions are skipped in calculations, so they should not
+  // block the review progress either.
+  const unreviewedCosts = costs.filter((c) => c.enabled !== false && !c.reviewed)
+    .length;
   const unreviewedPrepayments = prepayments.filter((p) => !p.reviewed).length;
   return unreviewedCosts + unreviewedPrepayments;
 }

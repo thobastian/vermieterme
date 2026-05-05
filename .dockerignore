@@ -9,6 +9,7 @@ node_modules
 *.db-journal
 design
 docs
+apps
 coverage
 .DS_Store
 README.md
