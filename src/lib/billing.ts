@@ -88,3 +88,24 @@ export function getDaysInPeriod(startDate: string, endDate: string): number {
   const diffTime = Math.abs(end.getTime() - start.getTime());
   return Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
 }
+
+// Recommended new monthly NK prepayment after a billing period that closes
+// with a shortfall (Nachzahlung): keep the current monthly amount and add the
+// shortfall spread over twelve months, rounded up to the next 5-EUR step. If
+// the period closes with a refund, no change is suggested (returns null).
+export function suggestNextPrepayment(
+  currentMonthly: number,
+  resultAmount: number
+): number | null {
+  if (resultAmount <= 0) return null;
+  const raw = currentMonthly + resultAmount / 12;
+  return Math.ceil(raw / 5) * 5;
+}
+
+// Default effective date for a new prepayment that follows a closed billing
+// period: the day after the period ends.
+export function dayAfter(dateStr: string): string {
+  const d = new Date(dateStr);
+  d.setDate(d.getDate() + 1);
+  return d.toISOString().split("T")[0];
+}

@@ -6,14 +6,33 @@ import Link from "next/link";
 import { EyeIcon, EyeOffIcon } from "lucide-react";
 import { Nav } from "@/components/nav";
 import { formatCurrency, formatDate } from "@/lib/format";
-import { calculateMEAAmount, getMonthsInPeriod, getDaysInPeriod } from "@/lib/billing";
+import {
+  calculateMEAAmount,
+  dayAfter,
+  getDaysInPeriod,
+  getMonthsInPeriod,
+  suggestNextPrepayment,
+} from "@/lib/billing";
 import { DISTRIBUTION_KEYS } from "@/lib/constants";
 import { Loading } from "@/components/ui/loading";
 import { EmptyState } from "@/components/ui/empty-state";
 import { OptionalDateInput } from "@/components/ui/optional-date-input";
 import { Combobox } from "@/components/ui/combobox";
 import { DocumentUpload } from "@/components/document-upload";
+import {
+  RentChangeDialog,
+  type RentChangeDialogValue,
+} from "@/components/rent-change-dialog";
 import type { BillingPeriodDetail, CostCategory, Tenant, UnitWithTenants } from "@/types";
+
+interface NkSuggestionTarget {
+  unitId: string;
+  unitName: string;
+  tenantName: string;
+  currentMonthly: number;
+  shortfall: number;
+  suggested: number;
+}
 
 interface CostFormValue {
   totalAmount: string;
@@ -48,6 +67,11 @@ export default function BillingDetailPage() {
   const [prepaymentValues, setPrepaymentValues] = useState<
     Record<string, string>
   >({});
+
+  const [nkAdjustTarget, setNkAdjustTarget] = useState<NkSuggestionTarget | null>(
+    null
+  );
+  const [nkAppliedUnitIds, setNkAppliedUnitIds] = useState<Set<string>>(new Set());
 
   const debounceRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -285,6 +309,32 @@ export default function BillingDetailPage() {
       }
     } catch (error) {
       console.error("Failed to confirm prepayment:", error);
+    }
+  }
+
+  async function applyNkAdjustment(
+    target: NkSuggestionTarget,
+    value: RentChangeDialogValue
+  ) {
+    try {
+      const res = await fetch("/api/rent-changes", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          unitId: target.unitId,
+          type: "prepayment",
+          amount: value.amount,
+          effectiveDate: value.effectiveDate,
+          reason:
+            value.reason ??
+            `NK-Anpassung nach Abrechnung (Nachzahlung ${target.shortfall.toFixed(2)} €)`,
+        }),
+      });
+      if (res.ok) {
+        setNkAppliedUnitIds((prev) => new Set(prev).add(target.unitId));
+      }
+    } catch (error) {
+      console.error("Failed to create prepayment adjustment:", error);
     }
   }
 
@@ -908,6 +958,104 @@ export default function BillingDetailPage() {
           )}
         </section>
 
+        {/* Section 3b: NK-Anpassungs-Empfehlungen (nur bei Nachzahlung) */}
+        {(() => {
+          const recommendations = units
+            .map((unit) => {
+              const tenant = getCurrentTenant(unit);
+              const monthly = parseFloat(prepaymentValues[unit.id] || "0") || 0;
+              const unitCosts = calculateUnitCosts(unit);
+              const unitPrepayment = calculateUnitPrepayment(unit.id);
+              const shortfall = unitCosts - unitPrepayment;
+              const suggested = suggestNextPrepayment(monthly, shortfall);
+              if (suggested == null) return null;
+              return {
+                unit,
+                tenant,
+                monthly,
+                shortfall,
+                suggested,
+              };
+            })
+            .filter((r): r is NonNullable<typeof r> => r !== null);
+
+          if (recommendations.length === 0) return null;
+
+          return (
+            <section className="mt-8">
+              <h2 className="mb-4 text-lg font-semibold text-zinc-900">
+                Empfohlene NK-Vorauszahlungs-Anpassungen
+              </h2>
+              <div className="space-y-3">
+                {recommendations.map(
+                  ({ unit, tenant, monthly, shortfall, suggested }) => {
+                    const tenantName = tenant
+                      ? `${tenant.firstName} ${tenant.lastName}`
+                      : "Kein Mieter";
+                    const applied = nkAppliedUnitIds.has(unit.id);
+                    return (
+                      <div
+                        key={unit.id}
+                        className="rounded-xl border border-zinc-200 bg-white p-6 shadow-sm border-l-4 border-l-amber-400"
+                      >
+                        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                          <div className="min-w-0 flex-1">
+                            <p className="font-medium text-zinc-900">
+                              {tenantName}
+                              <span className="ml-2 text-sm font-normal text-zinc-500">
+                                {unit.name}
+                              </span>
+                            </p>
+                            <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
+                              <span className="text-zinc-600">
+                                Nachzahlung:{" "}
+                                <span className="font-medium text-red-600">
+                                  {formatCurrency(shortfall)}
+                                </span>
+                              </span>
+                              <span className="text-zinc-400">|</span>
+                              <span className="text-zinc-600">
+                                NK-Vorauszahlung: {formatCurrency(monthly)} &rarr;{" "}
+                                <span className="font-medium text-zinc-900">
+                                  {formatCurrency(suggested)}
+                                </span>
+                                <span className="ml-1 text-zinc-400">/Monat</span>
+                              </span>
+                            </div>
+                          </div>
+                          <div className="flex flex-shrink-0 items-center gap-2">
+                            {applied ? (
+                              <span className="inline-flex rounded-full bg-green-100 px-3 py-1 text-xs font-medium text-green-700">
+                                Anpassung angelegt
+                              </span>
+                            ) : (
+                              <button
+                                onClick={() =>
+                                  setNkAdjustTarget({
+                                    unitId: unit.id,
+                                    unitName: unit.name,
+                                    tenantName,
+                                    currentMonthly: monthly,
+                                    shortfall,
+                                    suggested,
+                                  })
+                                }
+                                className="rounded-lg bg-red-700 px-3 py-1.5 text-xs font-medium text-white hover:bg-red-800"
+                              >
+                                Anpassung anlegen
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  }
+                )}
+              </div>
+            </section>
+          );
+        })()}
+
         {/* Section 4: Dokumente */}
         <section className="mt-8">
           <h2 className="mb-4 text-lg font-semibold text-zinc-900">
@@ -963,6 +1111,30 @@ export default function BillingDetailPage() {
             </a>
           </div>
         </div>
+
+        <RentChangeDialog
+          open={nkAdjustTarget !== null}
+          onOpenChange={(open) => !open && setNkAdjustTarget(null)}
+          onSubmit={(value) => {
+            if (nkAdjustTarget) return applyNkAdjustment(nkAdjustTarget, value);
+          }}
+          title="NK-Vorauszahlung anpassen"
+          description={
+            nkAdjustTarget
+              ? `${nkAdjustTarget.tenantName} (${nkAdjustTarget.unitName}): aktuell ${formatCurrency(nkAdjustTarget.currentMonthly)}/Monat, Vorschlag ${formatCurrency(nkAdjustTarget.suggested)}/Monat nach Nachzahlung von ${formatCurrency(nkAdjustTarget.shortfall)}. Betrag bei Bedarf anpassen.`
+              : ""
+          }
+          defaultAmount={nkAdjustTarget?.suggested ?? 0}
+          defaultEffectiveDate={
+            billingPeriod ? dayAfter(billingPeriod.endDate) : ""
+          }
+          defaultReason={
+            nkAdjustTarget
+              ? `NK-Anpassung nach Abrechnung (Nachzahlung ${nkAdjustTarget.shortfall.toFixed(2)} €)`
+              : ""
+          }
+          amountLabel="Neue NK-Vorauszahlung (EUR / Monat)"
+        />
       </main>
     </>
   );

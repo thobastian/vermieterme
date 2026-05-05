@@ -8,7 +8,10 @@ import { getBillingStatus, calculateBillingTotals } from "@/lib/billing";
 import { useMultiFetch } from "@/hooks/use-fetch";
 import { Loading } from "@/components/ui/loading";
 import { EmptyState } from "@/components/ui/empty-state";
-import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import {
+  RentChangeDialog,
+  type RentChangeDialogValue,
+} from "@/components/rent-change-dialog";
 import type {
   PropertyWithCount,
   BillingPeriodWithProperty,
@@ -39,19 +42,23 @@ export default function DashboardPage() {
   const landlord = data.landlord;
   const vpiSuggestions = data.vpiSuggestions ?? [];
 
-  async function applyVpiAdjustment(suggestion: VpiSuggestion) {
-    setApplyTarget(null);
+  async function applyVpiAdjustment(
+    suggestion: VpiSuggestion,
+    value: RentChangeDialogValue
+  ) {
     try {
-      // 1. Create rent change with new amount
+      // 1. Create rent change with the (potentially edited) amount
       const res = await fetch("/api/rent-changes", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           unitId: suggestion.unitId,
           type: "rent",
-          amount: suggestion.suggestedRent,
-          effectiveDate: new Date().toISOString().split("T")[0],
-          reason: `VPI-Anpassung (${suggestion.referenceVpi} → ${suggestion.currentVpi}, ${suggestion.percentageChange > 0 ? "+" : ""}${suggestion.percentageChange.toFixed(2)}%)`,
+          amount: value.amount,
+          effectiveDate: value.effectiveDate,
+          reason:
+            value.reason ??
+            `VPI-Anpassung (${suggestion.referenceVpi} → ${suggestion.currentVpi}, ${suggestion.percentageChange > 0 ? "+" : ""}${suggestion.percentageChange.toFixed(2)}%)`,
         }),
       });
 
@@ -62,7 +69,7 @@ export default function DashboardPage() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             indexReferenceValue: suggestion.currentVpi,
-            indexReferenceDate: new Date().toISOString().split("T")[0],
+            indexReferenceDate: value.effectiveDate,
           }),
         });
 
@@ -335,18 +342,26 @@ export default function DashboardPage() {
             </div>
           </>
         )}
-        <ConfirmDialog
+        <RentChangeDialog
           open={applyTarget !== null}
           onOpenChange={(open) => !open && setApplyTarget(null)}
-          onConfirm={() => {
-            if (applyTarget) applyVpiAdjustment(applyTarget);
+          onSubmit={(value) => {
+            if (applyTarget) return applyVpiAdjustment(applyTarget, value);
           }}
           title="Mietanpassung durchführen"
           description={
             applyTarget
-              ? `Kaltmiete für ${applyTarget.tenantName} von ${formatCurrency(applyTarget.currentRent)} auf ${formatCurrency(applyTarget.suggestedRent)} anpassen (VPI ${applyTarget.percentageChange > 0 ? "+" : ""}${applyTarget.percentageChange.toFixed(2)}%)?`
+              ? `Kaltmiete für ${applyTarget.tenantName}: aktuell ${formatCurrency(applyTarget.currentRent)}, Vorschlag ${formatCurrency(applyTarget.suggestedRent)} (VPI ${applyTarget.percentageChange > 0 ? "+" : ""}${applyTarget.percentageChange.toFixed(2)}%). Betrag bei Bedarf anpassen.`
               : ""
           }
+          defaultAmount={applyTarget?.suggestedRent ?? 0}
+          defaultEffectiveDate={new Date().toISOString().split("T")[0]}
+          defaultReason={
+            applyTarget
+              ? `VPI-Anpassung (${applyTarget.referenceVpi} → ${applyTarget.currentVpi}, ${applyTarget.percentageChange > 0 ? "+" : ""}${applyTarget.percentageChange.toFixed(2)}%)`
+              : ""
+          }
+          amountLabel="Neue Kaltmiete (EUR)"
         />
       </main>
     </>
