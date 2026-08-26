@@ -7,6 +7,7 @@ import { EyeIcon, EyeOffIcon } from "lucide-react";
 import { Nav } from "@/components/nav";
 import { formatCurrency, formatDate } from "@/lib/format";
 import {
+  calculateAllocationAmount,
   calculateMEAAmount,
   dayAfter,
   getDaysInPeriod,
@@ -349,6 +350,17 @@ export default function BillingDetailPage() {
 
       if (effectiveKey === "MEA") {
         total += calculateMEAAmount(totalAmount, unit.shares, billingPeriod!.property.totalShares);
+      } else if (effectiveKey !== "laut Bescheid" && effectiveKey !== "siehe Anlage") {
+        const allocationKey = unit.allocationKeys?.find(
+          (key) => key.key === effectiveKey
+        );
+        total += allocationKey
+          ? calculateAllocationAmount(
+              totalAmount,
+              allocationKey.unitValue,
+              allocationKey.totalValue
+            )
+          : 0;
       } else {
         const unitAmount = costVal.unitAmount
           ? parseFloat(costVal.unitAmount)
@@ -415,6 +427,13 @@ export default function BillingDetailPage() {
 
   const property = billingPeriod.property;
   const units = property.units || [];
+  const allocationKeyNames = Array.from(
+    new Set(
+      units.flatMap((unit) =>
+        (unit.allocationKeys ?? []).map((allocationKey) => allocationKey.key)
+      )
+    )
+  );
   const monthsInPeriod = getMonthsInPeriod(billingPeriod.startDate, billingPeriod.endDate);
   const daysInPeriod = getDaysInPeriod(billingPeriod.startDate, billingPeriod.endDate);
 
@@ -590,23 +609,44 @@ export default function BillingDetailPage() {
                     const effectiveKey =
                       costVal.distributionKeyOverride ?? cat.distributionKey;
                     const isMEA = effectiveKey === "MEA";
+                    const isManual =
+                      effectiveKey === "laut Bescheid" ||
+                      effectiveKey === "siehe Anlage";
+                    const isCustomAllocationKey = !isMEA && !isManual;
                     const needsUnitAmount =
                       effectiveKey === "laut Bescheid" ||
                       effectiveKey === "siehe Anlage";
 
-                    let meaDisplay = "";
-                    if (isMEA && costVal.totalAmount && units.length > 0) {
+                    let calculatedDisplay = "";
+                    if (costVal.totalAmount && units.length > 0) {
                       const amounts = units.map(
-                        (u) =>
-                          `${u.name}: ${formatCurrency(
-                            calculateMEAAmount(
-                              parseFloat(costVal.totalAmount) || 0,
+                        (u) => {
+                          const totalAmount =
+                            parseFloat(costVal.totalAmount) || 0;
+                          let amount = 0;
+                          if (isMEA) {
+                            amount = calculateMEAAmount(
+                              totalAmount,
                               u.shares,
                               property.totalShares
-                            )
-                          )}`
+                            );
+                          } else if (isCustomAllocationKey) {
+                            const allocationKey = u.allocationKeys?.find(
+                              (key) => key.key === effectiveKey
+                            );
+                            amount = allocationKey
+                              ? calculateAllocationAmount(
+                                  totalAmount,
+                                  allocationKey.unitValue,
+                                  allocationKey.totalValue
+                                )
+                              : 0;
+                          }
+
+                          return `${u.name}: ${formatCurrency(amount)}`;
+                        }
                       );
-                      meaDisplay = amounts.join(", ");
+                      calculatedDisplay = amounts.join(", ");
                     }
 
                     const isUnreviewed =
@@ -624,6 +664,12 @@ export default function BillingDetailPage() {
                         value: k,
                         label: k,
                       })),
+                      ...allocationKeyNames
+                        .filter((key) => !DISTRIBUTION_KEYS.includes(key))
+                        .map((key) => ({
+                          value: key,
+                          label: key,
+                        })),
                     ];
 
                     return (
@@ -732,9 +778,10 @@ export default function BillingDetailPage() {
                                 className="w-32 rounded-lg border border-zinc-300 px-3 py-2 text-right text-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 disabled:bg-zinc-100 disabled:text-zinc-400"
                               />
                             </div>
-                          ) : isMEA ? (
+                          ) : isMEA || isCustomAllocationKey ? (
                             <div className="text-sm text-zinc-500">
-                              {meaDisplay || "Automatisch (MEA)"}
+                              {calculatedDisplay ||
+                                `Automatisch (${effectiveKey})`}
                             </div>
                           ) : (
                             <div className="text-sm text-zinc-400">

@@ -24,10 +24,19 @@ export interface Unit {
   name: string;
   floor: string;
   shares: number;
+  allocationKeys?: UnitAllocationKey[];
 }
 
 export interface UnitWithTenants extends Unit {
   tenants: Tenant[];
+}
+
+export interface UnitAllocationKey {
+  id: string;
+  unitId: string;
+  key: string;
+  unitValue: number;
+  totalValue: number;
 }
 
 // === Tenant ===

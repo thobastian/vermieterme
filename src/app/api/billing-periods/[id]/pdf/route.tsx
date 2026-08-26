@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth";
 import React from "react";
 import { renderToBuffer } from "@react-pdf/renderer";
 import { getDefaultConfig } from "@/lib/pdf-template";
+import { calculateAllocationAmount, calculateMEAAmount } from "@/lib/billing";
 import type { PdfTemplateConfig } from "@/types/pdf-template";
 import { BillingPdf, daysBetween } from "@/lib/billing-pdf";
 
@@ -40,6 +41,9 @@ export async function GET(
             units: {
               include: {
                 tenants: true,
+                allocationKeys: {
+                  orderBy: { key: "asc" },
+                },
                 prepayments: {
                   where: { billingPeriodId: id },
                 },
@@ -118,14 +122,35 @@ export async function GET(
           totalAmount: number;
           unitAmount: number | null;
           distributionKeyOverride: string | null;
-        }) => ({
-          categoryName: cost.costCategory.name,
-          // Per-period override takes precedence over the category default.
-          distributionKey:
-            cost.distributionKeyOverride ?? cost.costCategory.distributionKey,
-          totalAmount: cost.totalAmount,
-          unitAmount: cost.unitAmount ?? 0,
-        })
+        }) => {
+          const distributionKey =
+            cost.distributionKeyOverride ?? cost.costCategory.distributionKey;
+          const allocationKey = targetUnit.allocationKeys?.find(
+            (key: { key: string }) => key.key === distributionKey
+          );
+          const unitAmount =
+            distributionKey === "MEA"
+              ? calculateMEAAmount(
+                  cost.totalAmount,
+                  targetUnit.shares,
+                  property.totalShares
+                )
+              : allocationKey
+                ? calculateAllocationAmount(
+                    cost.totalAmount,
+                    allocationKey.unitValue,
+                    allocationKey.totalValue
+                  )
+                : cost.unitAmount ?? 0;
+
+          return {
+            categoryName: cost.costCategory.name,
+            // Per-period override takes precedence over the category default.
+            distributionKey,
+            totalAmount: cost.totalAmount,
+            unitAmount,
+          };
+        }
       );
 
     const totalCosts = costs.reduce(

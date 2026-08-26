@@ -67,17 +67,32 @@ model Property {
 }
 
 model Unit {
-  id          String       @id @default(cuid())
-  propertyId  String
-  name        String
-  floor       String
-  shares      Int
-  property    Property     @relation(fields: [propertyId], references: [id], onDelete: Cascade)
-  tenants     Tenant[]
-  prepayments Prepayment[]
-  rentChanges RentChange[]
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
+  id             String              @id @default(cuid())
+  propertyId     String
+  name           String
+  floor          String
+  shares         Int
+  property       Property            @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  tenants        Tenant[]
+  prepayments    Prepayment[]
+  rentChanges    RentChange[]
+  allocationKeys UnitAllocationKey[]
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+}
+
+model UnitAllocationKey {
+  id         String   @id @default(cuid())
+  unitId     String
+  key        String
+  unitValue  Float
+  totalValue Float
+  unit       Unit     @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([unitId, key])
+  @@index([key])
 }
 
 model Tenant {

@@ -8,6 +8,7 @@ export function GET() {
     const [
       properties,
       units,
+      unitAllocationKeys,
       tenants,
       costCategories,
       billingPeriods,
@@ -21,6 +22,7 @@ export function GET() {
     ] = await Promise.all([
       prisma.property.findMany(),
       prisma.unit.findMany(),
+      prisma.unitAllocationKey.findMany(),
       prisma.tenant.findMany(),
       prisma.costCategory.findMany(),
       prisma.billingPeriod.findMany(),
@@ -39,6 +41,7 @@ export function GET() {
       data: {
         properties,
         units,
+        unitAllocationKeys,
         tenants,
         costCategories,
         billingPeriods,
@@ -103,6 +106,7 @@ export function POST(request: Request) {
       prisma.cost.deleteMany(),
       prisma.prepayment.deleteMany(),
       prisma.tenant.deleteMany(),
+      prisma.unitAllocationKey.deleteMany(),
       prisma.billingPeriod.deleteMany(),
       prisma.unit.deleteMany(),
       prisma.property.deleteMany(),
@@ -123,6 +127,9 @@ export function POST(request: Request) {
         : []),
       ...(data.units.length > 0
         ? [prisma.unit.createMany({ data: data.units })]
+        : []),
+      ...((data.unitAllocationKeys?.length ?? 0) > 0
+        ? [prisma.unitAllocationKey.createMany({ data: data.unitAllocationKeys })]
         : []),
       ...(data.billingPeriods.length > 0
         ? [prisma.billingPeriod.createMany({ data: data.billingPeriods })]

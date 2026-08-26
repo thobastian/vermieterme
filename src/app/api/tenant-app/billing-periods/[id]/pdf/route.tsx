@@ -5,6 +5,7 @@ import { getDefaultConfig } from "@/lib/pdf-template";
 import type { PdfTemplateConfig } from "@/types/pdf-template";
 import { BillingPdf, daysBetween } from "@/lib/billing-pdf";
 import { requireTenantAuth } from "@/lib/tenant-auth";
+import { calculateAllocationAmount, calculateMEAAmount } from "@/lib/billing";
 import { ApiError } from "@/lib/api-utils";
 
 export async function GET(
@@ -17,7 +18,14 @@ export async function GET(
 
     const tenant = await prisma.tenant.findUnique({
       where: { id: tenantId },
-      include: { unit: { include: { property: true } } },
+      include: {
+        unit: {
+          include: {
+            property: true,
+            allocationKeys: true,
+          },
+        },
+      },
     });
 
     if (!tenant) {
@@ -68,13 +76,30 @@ export async function GET(
 
     const costs = billingPeriod.costs
       .filter((cost) => cost.enabled !== false)
-      .map((cost) => ({
-        categoryName: cost.costCategory.name,
-        distributionKey:
-          cost.distributionKeyOverride ?? cost.costCategory.distributionKey,
-        totalAmount: cost.totalAmount,
-        unitAmount: cost.unitAmount ?? 0,
-      }));
+      .map((cost) => {
+        const distributionKey =
+          cost.distributionKeyOverride ?? cost.costCategory.distributionKey;
+        const allocationKey = unit.allocationKeys.find(
+          (key) => key.key === distributionKey
+        );
+        const unitAmount =
+          distributionKey === "MEA"
+            ? calculateMEAAmount(cost.totalAmount, unit.shares, property.totalShares)
+            : allocationKey
+              ? calculateAllocationAmount(
+                  cost.totalAmount,
+                  allocationKey.unitValue,
+                  allocationKey.totalValue
+                )
+              : cost.unitAmount ?? 0;
+
+        return {
+          categoryName: cost.costCategory.name,
+          distributionKey,
+          totalAmount: cost.totalAmount,
+          unitAmount,
+        };
+      });
 
     const totalCosts = costs.reduce((sum, c) => sum + c.totalAmount, 0);
     const totalUnitCosts = costs.reduce((sum, c) => sum + c.unitAmount, 0);

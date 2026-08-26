@@ -6,7 +6,38 @@ import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Loading } from "@/components/ui/loading";
 import { EmptyState } from "@/components/ui/empty-state";
 import { formatCurrency } from "@/lib/format";
-import type { PropertyWithCount, PropertyWithUnits, UnitWithTenants, Tenant, RentChange } from "@/types";
+import type { PropertyWithCount, PropertyWithUnits, UnitWithTenants, Tenant, RentChange, UnitAllocationKey } from "@/types";
+
+function formatAllocationKeys(keys: UnitAllocationKey[] = []): string {
+  return keys
+    .map((key) => `${key.key}: ${key.unitValue} / ${key.totalValue}`)
+    .join("\n");
+}
+
+function parseAllocationKeys(value: string) {
+  return value
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => {
+      const [rawKey, rawValues] = line.split(":");
+      if (!rawKey || !rawValues) return null;
+      const [rawUnitValue, rawTotalValue] = rawValues.split("/");
+      const unitValue = Number(rawUnitValue?.trim().replace(",", "."));
+      const totalValue = Number(rawTotalValue?.trim().replace(",", "."));
+
+      if (!Number.isFinite(unitValue) || !Number.isFinite(totalValue)) {
+        return null;
+      }
+
+      return {
+        key: rawKey.trim(),
+        unitValue,
+        totalValue,
+      };
+    })
+    .filter((key): key is { key: string; unitValue: number; totalValue: number } => key !== null);
+}
 
 export default function PropertiesPage() {
   const [properties, setProperties] = useState<PropertyWithCount[]>([]);
@@ -34,6 +65,7 @@ export default function PropertiesPage() {
     name: "",
     floor: "",
     shares: 0,
+    allocationKeysText: "",
   });
 
   useEffect(() => {
@@ -169,10 +201,16 @@ export default function PropertiesPage() {
       const res = await fetch("/api/units", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...unitForm, propertyId }),
+        body: JSON.stringify({
+          propertyId,
+          name: unitForm.name,
+          floor: unitForm.floor,
+          shares: unitForm.shares,
+          allocationKeys: parseAllocationKeys(unitForm.allocationKeysText),
+        }),
       });
       if (res.ok) {
-        setUnitForm({ name: "", floor: "", shares: 0 });
+        setUnitForm({ name: "", floor: "", shares: 0, allocationKeysText: "" });
         setShowNewUnitForm(null);
         await fetchPropertyDetail(propertyId);
         await fetchProperties();
@@ -187,11 +225,17 @@ export default function PropertiesPage() {
       const res = await fetch(`/api/units/${unitId}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...unitForm, propertyId }),
+        body: JSON.stringify({
+          propertyId,
+          name: unitForm.name,
+          floor: unitForm.floor,
+          shares: unitForm.shares,
+          allocationKeys: parseAllocationKeys(unitForm.allocationKeysText),
+        }),
       });
       if (res.ok) {
         setEditingUnitId(null);
-        setUnitForm({ name: "", floor: "", shares: 0 });
+        setUnitForm({ name: "", floor: "", shares: 0, allocationKeysText: "" });
         await fetchPropertyDetail(propertyId);
       }
     } catch (error) {
@@ -217,6 +261,7 @@ export default function PropertiesPage() {
       name: unit.name,
       floor: unit.floor,
       shares: unit.shares,
+      allocationKeysText: formatAllocationKeys(unit.allocationKeys),
     });
   }
 
@@ -514,7 +559,12 @@ export default function PropertiesPage() {
                             showNewUnitForm === property.id ? null : property.id
                           );
                           setEditingUnitId(null);
-                          setUnitForm({ name: "", floor: "", shares: 0 });
+                          setUnitForm({
+                            name: "",
+                            floor: "",
+                            shares: 0,
+                            allocationKeysText: "",
+                          });
                         }}
                         className="rounded-lg border border-zinc-300 px-3 py-1.5 text-xs font-medium text-zinc-700 hover:bg-zinc-50"
                       >
@@ -582,6 +632,26 @@ export default function PropertiesPage() {
                               className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
                             />
                           </div>
+                        </div>
+                        <div className="mt-3">
+                          <label className="mb-1 block text-xs font-medium text-zinc-700">
+                            Weitere Umlageschlüssel
+                          </label>
+                          <textarea
+                            value={unitForm.allocationKeysText}
+                            onChange={(e) =>
+                              setUnitForm({
+                                ...unitForm,
+                                allocationKeysText: e.target.value,
+                              })
+                            }
+                            placeholder={"z.B.\nWohneinheiten: 1 / 71\nAufzugsfläche: 29.155 / 1824.378"}
+                            rows={3}
+                            className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+                          />
+                          <p className="mt-1 text-xs text-zinc-500">
+                            Eine Zeile pro Schlüssel: Name: Einzelanteil / Gesamtanteil
+                          </p>
                         </div>
                         <div className="mt-3 flex gap-2">
                           <button
@@ -667,7 +737,7 @@ export default function PropertiesPage() {
                                           className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
                                         />
                                       </div>
-                                      <div className="flex gap-2">
+                                      <div>
                                         <input
                                           type="number"
                                           required
@@ -681,6 +751,26 @@ export default function PropertiesPage() {
                                           }
                                           className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
                                         />
+                                      </div>
+                                    </div>
+                                    <div className="mt-3">
+                                      <label className="mb-1 block text-xs font-medium text-zinc-700">
+                                        Weitere Umlageschlüssel
+                                      </label>
+                                      <textarea
+                                        value={unitForm.allocationKeysText}
+                                        onChange={(e) =>
+                                          setUnitForm({
+                                            ...unitForm,
+                                            allocationKeysText: e.target.value,
+                                          })
+                                        }
+                                        placeholder={"z.B.\nWohneinheiten: 1 / 71\nAufzugsfläche: 29.155 / 1824.378"}
+                                        rows={3}
+                                        className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+                                      />
+                                    </div>
+                                    <div className="mt-3 flex gap-2">
                                         <button
                                           onClick={() =>
                                             handleUpdateUnit(
@@ -699,13 +789,13 @@ export default function PropertiesPage() {
                                               name: "",
                                               floor: "",
                                               shares: 0,
+                                              allocationKeysText: "",
                                             });
                                           }}
                                           className="rounded-lg border border-zinc-300 px-3 py-1.5 text-xs font-medium text-zinc-700 hover:bg-zinc-50"
                                         >
                                           Abbrechen
                                         </button>
-                                      </div>
                                     </div>
                                   </td>
                                 </tr>
@@ -718,7 +808,16 @@ export default function PropertiesPage() {
                                     {unit.floor}
                                   </td>
                                   <td className="py-3 text-sm text-zinc-600">
-                                    {unit.shares}
+                                    <div>{unit.shares}</div>
+                                    {unit.allocationKeys && unit.allocationKeys.length > 0 && (
+                                      <div className="mt-1 space-y-0.5 text-xs text-zinc-400">
+                                        {unit.allocationKeys.map((key) => (
+                                          <div key={key.id}>
+                                            {key.key}: {key.unitValue} / {key.totalValue}
+                                          </div>
+                                        ))}
+                                      </div>
+                                    )}
                                   </td>
                                   <td className="py-3 text-sm text-zinc-600">
                                     {currentTenant
