@@ -128,6 +128,7 @@ model CostCategory {
   name            String
   distributionKey String
   apportionable   Boolean  @default(true)
+  requiresAttachment Boolean @default(false)
   sortOrder       Int      @default(0)
   costs           Cost[]
   createdAt       DateTime @default(now())

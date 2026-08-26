@@ -98,6 +98,7 @@ export async function GET(
 
         return {
           categoryName: cost.costCategory.name,
+          requiresAttachment: cost.costCategory.requiresAttachment,
           distributionKey,
           totalAmount: cost.totalAmount,
           unitAmount,

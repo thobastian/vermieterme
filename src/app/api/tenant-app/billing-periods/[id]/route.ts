@@ -80,6 +80,7 @@ export function GET(
       return {
         id: cost.id,
         category: cost.costCategory.name,
+        requiresAttachment: cost.costCategory.requiresAttachment,
         distributionKey,
         totalAmount: cost.totalAmount,
         unitAmount: unitAmount ?? 0,

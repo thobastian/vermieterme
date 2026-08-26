@@ -119,7 +119,11 @@ export async function GET(
       )
       .map(
         (cost: {
-          costCategory: { name: string; distributionKey: string };
+          costCategory: {
+            name: string;
+            distributionKey: string;
+            requiresAttachment: boolean;
+          };
           totalAmount: number;
           unitAmount: number | null;
           distributionKeyOverride: string | null;
@@ -146,6 +150,7 @@ export async function GET(
 
           return {
             categoryName: cost.costCategory.name,
+            requiresAttachment: cost.costCategory.requiresAttachment,
             // Per-period override takes precedence over the category default.
             distributionKey,
             totalAmount: cost.totalAmount,

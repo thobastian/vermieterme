@@ -126,6 +126,7 @@ export interface CostCategory {
   name: string;
   distributionKey: string;
   apportionable: boolean;
+  requiresAttachment: boolean;
   sortOrder: number;
 }
 

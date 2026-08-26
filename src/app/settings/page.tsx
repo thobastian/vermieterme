@@ -35,6 +35,7 @@ export default function SettingsPage() {
     name: "",
     distributionKey: "MEA",
     apportionable: true,
+    requiresAttachment: false,
     sortOrder: 0,
   });
   const [deleteCategoryId, setDeleteCategoryId] = useState<string | null>(null);
@@ -145,7 +146,7 @@ export default function SettingsPage() {
         body: JSON.stringify(categoryForm),
       });
       if (res.ok) {
-        setCategoryForm({ name: "", distributionKey: "MEA", apportionable: true, sortOrder: 0 });
+        setCategoryForm({ name: "", distributionKey: "MEA", apportionable: true, requiresAttachment: false, sortOrder: 0 });
         setShowNewCategoryForm(false);
         await fetchCategories();
       }
@@ -163,7 +164,7 @@ export default function SettingsPage() {
       });
       if (res.ok) {
         setEditingCategoryId(null);
-        setCategoryForm({ name: "", distributionKey: "MEA", apportionable: true, sortOrder: 0 });
+        setCategoryForm({ name: "", distributionKey: "MEA", apportionable: true, requiresAttachment: false, sortOrder: 0 });
         await fetchCategories();
       }
     } catch (error) {
@@ -311,6 +312,7 @@ export default function SettingsPage() {
       name: cat.name,
       distributionKey: cat.distributionKey,
       apportionable: cat.apportionable ?? true,
+      requiresAttachment: cat.requiresAttachment ?? false,
       sortOrder: cat.sortOrder,
     });
   }
@@ -565,6 +567,7 @@ export default function SettingsPage() {
                   name: "",
                   distributionKey: "MEA",
                   apportionable: true,
+                  requiresAttachment: false,
                   sortOrder:
                     costCategories.length > 0
                       ? Math.max(...costCategories.map((c) => c.sortOrder)) + 1
@@ -586,7 +589,7 @@ export default function SettingsPage() {
               <h3 className="mb-4 text-sm font-semibold text-zinc-700">
                 Neue Kostenart anlegen
               </h3>
-              <div className="grid gap-4 sm:grid-cols-4">
+              <div className="grid gap-4 sm:grid-cols-5">
                 <div>
                   <label className="mb-1 block text-sm font-medium text-zinc-700">
                     Name
@@ -654,6 +657,20 @@ export default function SettingsPage() {
                   />
                   Umlagefähig
                 </label>
+                <label className="flex items-center gap-2 self-end rounded-lg border border-zinc-200 px-3 py-2 text-sm text-zinc-700">
+                  <input
+                    type="checkbox"
+                    checked={categoryForm.requiresAttachment}
+                    onChange={(e) =>
+                      setCategoryForm({
+                        ...categoryForm,
+                        requiresAttachment: e.target.checked,
+                      })
+                    }
+                    className="h-4 w-4 rounded border-zinc-300"
+                  />
+                  Anlage erforderlich
+                </label>
               </div>
               <div className="mt-4 flex gap-2">
                 <button
@@ -697,6 +714,9 @@ export default function SettingsPage() {
                     <th className="px-4 py-3 text-left text-xs font-medium uppercase text-zinc-500">
                       Umlagefähig
                     </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium uppercase text-zinc-500">
+                      Anlage
+                    </th>
                     <th className="px-4 py-3 text-right text-xs font-medium uppercase text-zinc-500">
                       Aktionen
                     </th>
@@ -706,8 +726,8 @@ export default function SettingsPage() {
                   {costCategories.map((cat) =>
                     editingCategoryId === cat.id ? (
                       <tr key={cat.id}>
-                        <td className="px-4 py-3" colSpan={5}>
-                          <div className="grid gap-3 sm:grid-cols-4">
+                        <td className="px-4 py-3" colSpan={6}>
+                          <div className="grid gap-3 sm:grid-cols-5">
                             <div>
                               <input
                                 type="text"
@@ -762,6 +782,20 @@ export default function SettingsPage() {
                                 />
                                 Umlagefähig
                               </label>
+                              <label className="flex items-center gap-2 rounded-lg border border-zinc-200 px-3 py-2 text-sm text-zinc-700">
+                                <input
+                                  type="checkbox"
+                                  checked={categoryForm.requiresAttachment}
+                                  onChange={(e) =>
+                                    setCategoryForm({
+                                      ...categoryForm,
+                                      requiresAttachment: e.target.checked,
+                                    })
+                                  }
+                                  className="h-4 w-4 rounded border-zinc-300"
+                                />
+                                Anlage
+                              </label>
                               <button
                                 onClick={() => handleUpdateCategory(cat.id)}
                                 className="rounded-lg bg-red-700 px-3 py-1.5 text-xs font-medium text-white hover:bg-red-800"
@@ -775,6 +809,7 @@ export default function SettingsPage() {
                                     name: "",
                                     distributionKey: "MEA",
                                     apportionable: true,
+                                    requiresAttachment: false,
                                     sortOrder: 0,
                                   });
                                 }}
@@ -808,6 +843,17 @@ export default function SettingsPage() {
                             }`}
                           >
                             {cat.apportionable ? "Ja" : "Nein"}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3">
+                          <span
+                            className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                              cat.requiresAttachment
+                                ? "bg-blue-100 text-blue-700"
+                                : "bg-zinc-100 text-zinc-500"
+                            }`}
+                          >
+                            {cat.requiresAttachment ? "Ja" : "Nein"}
                           </span>
                         </td>
                         <td className="px-4 py-3 text-right">

@@ -286,6 +286,7 @@ export interface BillingPdfProps {
   };
   costs: Array<{
     categoryName: string;
+    requiresAttachment?: boolean;
     distributionKey: string;
     totalAmount: number;
     unitAmount: number;
@@ -464,7 +465,10 @@ export function BillingPdf({
 
             {costs.map((cost, index) => (
               <View style={styles.tableRow} key={index}>
-                <Text style={styles.colKostenart}>{cost.categoryName}</Text>
+                <Text style={styles.colKostenart}>
+                  {cost.categoryName}
+                  {cost.requiresAttachment ? " (Anlage)" : ""}
+                </Text>
                 <Text style={styles.colKosten}>
                   {formatCurrency(cost.totalAmount)} EUR
                 </Text>
