@@ -335,13 +335,22 @@ export function BillingPdf({
     return unit.allocationKeys?.find((allocationKey) => allocationKey.key === key);
   }
 
+  function formatDistributionValue(value: number): string {
+    return new Intl.NumberFormat("de-DE", {
+      maximumFractionDigits: 6,
+      useGrouping: false,
+    }).format(value);
+  }
+
   function distributionKeyText(key: string, shares: number): string {
     if (key === "MEA") return `${shares} MEA`;
     if (key === "laut Bescheid") return "laut Bescheid";
     if (key === "siehe Anlage") return "siehe Anlage";
     const allocationKey = getAllocationKey(key);
     if (allocationKey) {
-      return `${allocationKey.unitValue} / ${allocationKey.totalValue}`;
+      return `${formatDistributionValue(
+        allocationKey.unitValue
+      )} / ${formatDistributionValue(allocationKey.totalValue)}`;
     }
     return key;
   }
@@ -553,7 +562,8 @@ export function BillingPdf({
                       Individueller Umlageschlüssel
                     </Text>
                     <Text style={styles.distributionValues}>
-                      {allocationKey.unitValue} / {allocationKey.totalValue}
+                      {formatDistributionValue(allocationKey.unitValue)} /{" "}
+                      {formatDistributionValue(allocationKey.totalValue)}
                     </Text>
                   </View>
                 );

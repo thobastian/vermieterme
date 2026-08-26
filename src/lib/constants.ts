@@ -17,7 +17,7 @@ export const DISTRIBUTION_KEYS = [
   "MEA",
   "Wohneinheiten",
   "Wohnfläche",
-  "Aufzugsfläche",
+  "Wohnfläche ab 1.OG - Aufzug (m2)",
   "laut Bescheid",
   "siehe Anlage",
 ];

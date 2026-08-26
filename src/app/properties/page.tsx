@@ -8,9 +8,29 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { formatCurrency } from "@/lib/format";
 import type { PropertyWithCount, PropertyWithUnits, UnitWithTenants, Tenant, RentChange, UnitAllocationKey } from "@/types";
 
+function parseDecimal(value: string | undefined): number {
+  const raw = value?.trim() ?? "";
+  if (raw.includes(",")) {
+    return Number(raw.replace(/\./g, "").replace(",", "."));
+  }
+  return Number(raw);
+}
+
+function formatDecimal(value: number): string {
+  return new Intl.NumberFormat("de-DE", {
+    maximumFractionDigits: 6,
+    useGrouping: false,
+  }).format(value);
+}
+
 function formatAllocationKeys(keys: UnitAllocationKey[] = []): string {
   return keys
-    .map((key) => `${key.key}: ${key.unitValue} / ${key.totalValue}`)
+    .map(
+      (key) =>
+        `${key.key}: ${formatDecimal(key.unitValue)} / ${formatDecimal(
+          key.totalValue
+        )}`
+    )
     .join("\n");
 }
 
@@ -23,8 +43,8 @@ function parseAllocationKeys(value: string) {
       const [rawKey, rawValues] = line.split(":");
       if (!rawKey || !rawValues) return null;
       const [rawUnitValue, rawTotalValue] = rawValues.split("/");
-      const unitValue = Number(rawUnitValue?.trim().replace(",", "."));
-      const totalValue = Number(rawTotalValue?.trim().replace(",", "."));
+      const unitValue = parseDecimal(rawUnitValue);
+      const totalValue = parseDecimal(rawTotalValue);
 
       if (!Number.isFinite(unitValue) || !Number.isFinite(totalValue)) {
         return null;
@@ -645,7 +665,7 @@ export default function PropertiesPage() {
                                 allocationKeysText: e.target.value,
                               })
                             }
-                            placeholder={"z.B.\nWohneinheiten: 1 / 71\nAufzugsfläche: 29.155 / 1824.378"}
+                            placeholder={"z.B.\nWohneinheiten: 1 / 71\nWohnfläche ab 1.OG - Aufzug (m2): 29,155 / 1824,378"}
                             rows={3}
                             className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
                           />
@@ -765,7 +785,7 @@ export default function PropertiesPage() {
                                             allocationKeysText: e.target.value,
                                           })
                                         }
-                                        placeholder={"z.B.\nWohneinheiten: 1 / 71\nAufzugsfläche: 29.155 / 1824.378"}
+                                        placeholder={"z.B.\nWohneinheiten: 1 / 71\nWohnfläche ab 1.OG - Aufzug (m2): 29,155 / 1824,378"}
                                         rows={3}
                                         className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
                                       />
@@ -813,7 +833,7 @@ export default function PropertiesPage() {
                                       <div className="mt-1 space-y-0.5 text-xs text-zinc-400">
                                         {unit.allocationKeys.map((key) => (
                                           <div key={key.id}>
-                                            {key.key}: {key.unitValue} / {key.totalValue}
+                                            {key.key}: {formatDecimal(key.unitValue)} / {formatDecimal(key.totalValue)}
                                           </div>
                                         ))}
                                       </div>
