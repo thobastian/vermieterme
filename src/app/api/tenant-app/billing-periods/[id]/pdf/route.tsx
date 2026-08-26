@@ -75,7 +75,10 @@ export async function GET(
     const endDate = new Date(billingPeriod.endDate);
 
     const costs = billingPeriod.costs
-      .filter((cost) => cost.enabled !== false)
+      .filter(
+        (cost) =>
+          cost.enabled !== false && cost.costCategory.apportionable !== false
+      )
       .map((cost) => {
         const distributionKey =
           cost.distributionKeyOverride ?? cost.costCategory.distributionKey;

@@ -114,7 +114,8 @@ export async function GET(
 
     const costs = billingPeriod.costs
       .filter(
-        (cost: { enabled: boolean }) => cost.enabled !== false
+        (cost: { enabled: boolean; costCategory: { apportionable?: boolean } }) =>
+          cost.enabled !== false && cost.costCategory.apportionable !== false
       )
       .map(
         (cost: {

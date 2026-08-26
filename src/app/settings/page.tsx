@@ -34,6 +34,7 @@ export default function SettingsPage() {
   const [categoryForm, setCategoryForm] = useState({
     name: "",
     distributionKey: "MEA",
+    apportionable: true,
     sortOrder: 0,
   });
   const [deleteCategoryId, setDeleteCategoryId] = useState<string | null>(null);
@@ -144,7 +145,7 @@ export default function SettingsPage() {
         body: JSON.stringify(categoryForm),
       });
       if (res.ok) {
-        setCategoryForm({ name: "", distributionKey: "MEA", sortOrder: 0 });
+        setCategoryForm({ name: "", distributionKey: "MEA", apportionable: true, sortOrder: 0 });
         setShowNewCategoryForm(false);
         await fetchCategories();
       }
@@ -162,7 +163,7 @@ export default function SettingsPage() {
       });
       if (res.ok) {
         setEditingCategoryId(null);
-        setCategoryForm({ name: "", distributionKey: "MEA", sortOrder: 0 });
+        setCategoryForm({ name: "", distributionKey: "MEA", apportionable: true, sortOrder: 0 });
         await fetchCategories();
       }
     } catch (error) {
@@ -309,6 +310,7 @@ export default function SettingsPage() {
     setCategoryForm({
       name: cat.name,
       distributionKey: cat.distributionKey,
+      apportionable: cat.apportionable ?? true,
       sortOrder: cat.sortOrder,
     });
   }
@@ -562,6 +564,7 @@ export default function SettingsPage() {
                 setCategoryForm({
                   name: "",
                   distributionKey: "MEA",
+                  apportionable: true,
                   sortOrder:
                     costCategories.length > 0
                       ? Math.max(...costCategories.map((c) => c.sortOrder)) + 1
@@ -583,7 +586,7 @@ export default function SettingsPage() {
               <h3 className="mb-4 text-sm font-semibold text-zinc-700">
                 Neue Kostenart anlegen
               </h3>
-              <div className="grid gap-4 sm:grid-cols-3">
+              <div className="grid gap-4 sm:grid-cols-4">
                 <div>
                   <label className="mb-1 block text-sm font-medium text-zinc-700">
                     Name
@@ -637,6 +640,20 @@ export default function SettingsPage() {
                     className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
                   />
                 </div>
+                <label className="flex items-center gap-2 self-end rounded-lg border border-zinc-200 px-3 py-2 text-sm text-zinc-700">
+                  <input
+                    type="checkbox"
+                    checked={categoryForm.apportionable}
+                    onChange={(e) =>
+                      setCategoryForm({
+                        ...categoryForm,
+                        apportionable: e.target.checked,
+                      })
+                    }
+                    className="h-4 w-4 rounded border-zinc-300"
+                  />
+                  Umlagefähig
+                </label>
               </div>
               <div className="mt-4 flex gap-2">
                 <button
@@ -677,6 +694,9 @@ export default function SettingsPage() {
                     <th className="px-4 py-3 text-left text-xs font-medium uppercase text-zinc-500">
                       Verteilerschlüssel
                     </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium uppercase text-zinc-500">
+                      Umlagefähig
+                    </th>
                     <th className="px-4 py-3 text-right text-xs font-medium uppercase text-zinc-500">
                       Aktionen
                     </th>
@@ -686,8 +706,8 @@ export default function SettingsPage() {
                   {costCategories.map((cat) =>
                     editingCategoryId === cat.id ? (
                       <tr key={cat.id}>
-                        <td className="px-4 py-3" colSpan={4}>
-                          <div className="grid gap-3 sm:grid-cols-3">
+                        <td className="px-4 py-3" colSpan={5}>
+                          <div className="grid gap-3 sm:grid-cols-4">
                             <div>
                               <input
                                 type="text"
@@ -728,6 +748,20 @@ export default function SettingsPage() {
                                 }
                                 className="w-20 rounded-lg border border-zinc-300 px-3 py-2 text-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
                               />
+                              <label className="flex items-center gap-2 rounded-lg border border-zinc-200 px-3 py-2 text-sm text-zinc-700">
+                                <input
+                                  type="checkbox"
+                                  checked={categoryForm.apportionable}
+                                  onChange={(e) =>
+                                    setCategoryForm({
+                                      ...categoryForm,
+                                      apportionable: e.target.checked,
+                                    })
+                                  }
+                                  className="h-4 w-4 rounded border-zinc-300"
+                                />
+                                Umlagefähig
+                              </label>
                               <button
                                 onClick={() => handleUpdateCategory(cat.id)}
                                 className="rounded-lg bg-red-700 px-3 py-1.5 text-xs font-medium text-white hover:bg-red-800"
@@ -740,6 +774,7 @@ export default function SettingsPage() {
                                   setCategoryForm({
                                     name: "",
                                     distributionKey: "MEA",
+                                    apportionable: true,
                                     sortOrder: 0,
                                   });
                                 }}
@@ -762,6 +797,17 @@ export default function SettingsPage() {
                         <td className="px-4 py-3">
                           <span className="inline-flex rounded-full bg-zinc-100 px-2.5 py-0.5 text-xs font-medium text-zinc-700">
                             {cat.distributionKey}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3">
+                          <span
+                            className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                              cat.apportionable
+                                ? "bg-green-100 text-green-700"
+                                : "bg-zinc-100 text-zinc-600"
+                            }`}
+                          >
+                            {cat.apportionable ? "Ja" : "Nein"}
                           </span>
                         </td>
                         <td className="px-4 py-3 text-right">

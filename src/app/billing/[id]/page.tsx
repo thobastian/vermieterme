@@ -345,6 +345,7 @@ export default function BillingDetailPage() {
       const costVal = costValues[cat.id];
       if (!costVal || !costVal.totalAmount) return;
       if (costVal.enabled === false) return;
+      if (cat.apportionable === false) return;
       const totalAmount = parseFloat(costVal.totalAmount) || 0;
       const effectiveKey = costVal.distributionKeyOverride ?? cat.distributionKey;
 
@@ -606,6 +607,7 @@ export default function BillingDetailPage() {
                   {costCategories.map((cat) => {
                     const costVal = costValues[cat.id] || DEFAULT_COST_VALUE;
                     const enabled = costVal.enabled !== false;
+                    const apportionable = cat.apportionable !== false;
                     const effectiveKey =
                       costVal.distributionKeyOverride ?? cat.distributionKey;
                     const isMEA = effectiveKey === "MEA";
@@ -618,7 +620,7 @@ export default function BillingDetailPage() {
                       effectiveKey === "siehe Anlage";
 
                     let calculatedDisplay = "";
-                    if (costVal.totalAmount && units.length > 0) {
+                    if (apportionable && costVal.totalAmount && units.length > 0) {
                       const amounts = units.map(
                         (u) => {
                           const totalAmount =
@@ -678,6 +680,8 @@ export default function BillingDetailPage() {
                         className={
                           !enabled
                             ? "bg-zinc-50/60 text-zinc-400"
+                            : !apportionable
+                              ? "bg-zinc-50"
                             : isUnreviewed
                               ? "border-l-4 border-amber-400 bg-amber-50/50"
                               : ""
@@ -708,6 +712,11 @@ export default function BillingDetailPage() {
                             <span className={!enabled ? "line-through" : ""}>
                               {cat.name}
                             </span>
+                            {!apportionable && (
+                              <span className="rounded bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-600">
+                                nicht umlagefähig
+                              </span>
+                            )}
                             {isUnreviewed && (
                               <button
                                 type="button"
@@ -760,7 +769,11 @@ export default function BillingDetailPage() {
                           </div>
                         </td>
                         <td className="px-4 py-3 text-right">
-                          {needsUnitAmount ? (
+                          {!apportionable ? (
+                            <div className="text-sm text-zinc-400">
+                              Nicht berechnet
+                            </div>
+                          ) : needsUnitAmount ? (
                             <div className="flex justify-end">
                               <input
                                 type="number"

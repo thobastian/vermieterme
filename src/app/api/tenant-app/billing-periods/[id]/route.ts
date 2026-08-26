@@ -49,7 +49,10 @@ export function GET(
     const unit = tenant.unit;
     const property = unit.property;
 
-    const visibleCosts = bp.costs.filter((cost) => cost.enabled !== false);
+    const visibleCosts = bp.costs.filter(
+      (cost) =>
+        cost.enabled !== false && cost.costCategory.apportionable !== false
+    );
 
     const costs = visibleCosts.map((cost) => {
       // Per-period override takes precedence over the category default.

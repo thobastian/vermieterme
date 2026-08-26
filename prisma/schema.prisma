@@ -127,6 +127,7 @@ model CostCategory {
   id              String   @id @default(cuid())
   name            String
   distributionKey String
+  apportionable   Boolean  @default(true)
   sortOrder       Int      @default(0)
   costs           Cost[]
   createdAt       DateTime @default(now())
