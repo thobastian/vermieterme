@@ -99,6 +99,8 @@ export function POST(request: Request) {
               totalAmount: c.totalAmount,
               unitAmount: c.unitAmount,
               reviewed: false,
+              enabled: c.enabled,
+              distributionKeyOverride: c.distributionKeyOverride,
             })),
           });
         }

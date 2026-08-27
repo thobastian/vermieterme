@@ -253,7 +253,7 @@ export default function BillingDetailPage() {
     }
   }
 
-  async function handleDateChange(field: "sentDate" | "paidDate", value: string) {
+  async function handleDateChange(field: "billingDate" | "sentDate" | "paidDate", value: string) {
     try {
       const res = await fetch(`/api/billing-periods/${id}`, {
         method: "PUT",
@@ -484,6 +484,15 @@ export default function BillingDetailPage() {
               </p>
             )}
             <div className="mt-2 flex flex-wrap gap-4">
+              <div className="w-48">
+                <label className="mb-1 block text-xs font-medium text-zinc-500">
+                  Abrechnungsdatum
+                </label>
+                <OptionalDateInput
+                  value={billingPeriod.billingDate || ""}
+                  onChange={(value) => handleDateChange("billingDate", value)}
+                />
+              </div>
               <div className="w-48">
                 <label className="mb-1 block text-xs font-medium text-zinc-500">
                   Versendet am
