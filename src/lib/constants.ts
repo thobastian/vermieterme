@@ -18,6 +18,7 @@ export const DISTRIBUTION_KEYS = [
   "Wohneinheiten",
   "Wohnfläche",
   "Wohnfläche ab 1.OG - Aufzug (m2)",
+  "Brunata",
   "laut Bescheid",
   "siehe Anlage",
 ];

@@ -2,11 +2,19 @@
 
 import { useEffect, useState } from "react";
 import { Nav } from "@/components/nav";
+import { Combobox } from "@/components/ui/combobox";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Loading } from "@/components/ui/loading";
 import { EmptyState } from "@/components/ui/empty-state";
 import { formatCurrency } from "@/lib/format";
-import type { PropertyWithCount, PropertyWithUnits, UnitWithTenants, Tenant, RentChange, UnitAllocationKey } from "@/types";
+import { DISTRIBUTION_KEYS } from "@/lib/constants";
+import type { PropertyWithCount, PropertyWithUnits, UnitWithTenants, Tenant, RentChange, UnitAllocationKey, CostCategory } from "@/types";
+
+type AllocationKeyFormRow = {
+  key: string;
+  unitValue: string;
+  totalValue: string;
+};
 
 function parseDecimal(value: string | undefined): number {
   const raw = value?.trim() ?? "";
@@ -23,35 +31,26 @@ function formatDecimal(value: number): string {
   }).format(value);
 }
 
-function formatAllocationKeys(keys: UnitAllocationKey[] = []): string {
-  return keys
-    .map(
-      (key) =>
-        `${key.key}: ${formatDecimal(key.unitValue)} / ${formatDecimal(
-          key.totalValue
-        )}`
-    )
-    .join("\n");
+function formatAllocationKeyRows(keys: UnitAllocationKey[] = []): AllocationKeyFormRow[] {
+  return keys.map((key) => ({
+    key: key.key,
+    unitValue: formatDecimal(key.unitValue),
+    totalValue: formatDecimal(key.totalValue),
+  }));
 }
 
-function parseAllocationKeys(value: string) {
-  return value
-    .split("\n")
-    .map((line) => line.trim())
-    .filter(Boolean)
-    .map((line) => {
-      const [rawKey, rawValues] = line.split(":");
-      if (!rawKey || !rawValues) return null;
-      const [rawUnitValue, rawTotalValue] = rawValues.split("/");
-      const unitValue = parseDecimal(rawUnitValue);
-      const totalValue = parseDecimal(rawTotalValue);
+function parseAllocationKeyRows(rows: AllocationKeyFormRow[]) {
+  return rows
+    .map((row) => {
+      const unitValue = parseDecimal(row.unitValue);
+      const totalValue = parseDecimal(row.totalValue);
 
-      if (!Number.isFinite(unitValue) || !Number.isFinite(totalValue)) {
+      if (!row.key || !Number.isFinite(unitValue) || !Number.isFinite(totalValue)) {
         return null;
       }
 
       return {
-        key: rawKey.trim(),
+        key: row.key,
         unitValue,
         totalValue,
       };
@@ -71,6 +70,7 @@ export default function PropertiesPage() {
   const [deletePropertyId, setDeletePropertyId] = useState<string | null>(null);
   const [deleteUnitTarget, setDeleteUnitTarget] = useState<{ unitId: string; propertyId: string } | null>(null);
   const [rentChanges, setRentChanges] = useState<RentChange[]>([]);
+  const [costCategories, setCostCategories] = useState<CostCategory[]>([]);
 
   // Property form state
   const [propertyForm, setPropertyForm] = useState({
@@ -85,12 +85,13 @@ export default function PropertiesPage() {
     name: "",
     floor: "",
     shares: 0,
-    allocationKeysText: "",
+    allocationKeys: [] as AllocationKeyFormRow[],
   });
 
   useEffect(() => {
     fetchProperties();
     fetchRentChanges();
+    fetchCostCategories();
   }, []);
 
   async function fetchProperties() {
@@ -115,6 +116,57 @@ export default function PropertiesPage() {
     } catch (error) {
       console.error("Failed to fetch rent changes:", error);
     }
+  }
+
+  async function fetchCostCategories() {
+    try {
+      const res = await fetch("/api/cost-categories");
+      if (res.ok) {
+        setCostCategories(await res.json());
+      }
+    } catch (error) {
+      console.error("Failed to fetch cost categories:", error);
+    }
+  }
+
+  const allocationKeyOptions = Array.from(
+    new Set([
+      ...DISTRIBUTION_KEYS,
+      ...costCategories.map((category) => category.distributionKey),
+      ...unitForm.allocationKeys.map((row) => row.key),
+    ])
+  )
+    .filter((key) => key && key !== "MEA" && key !== "laut Bescheid" && key !== "siehe Anlage")
+    .map((key) => ({ value: key, label: key }));
+
+  function updateAllocationKeyRow(index: number, patch: Partial<AllocationKeyFormRow>) {
+    setUnitForm((current) => ({
+      ...current,
+      allocationKeys: current.allocationKeys.map((row, rowIndex) =>
+        rowIndex === index ? { ...row, ...patch } : row
+      ),
+    }));
+  }
+
+  function addAllocationKeyRow() {
+    setUnitForm((current) => ({
+      ...current,
+      allocationKeys: [
+        ...current.allocationKeys,
+        {
+          key: allocationKeyOptions[0]?.value ?? "",
+          unitValue: "",
+          totalValue: "",
+        },
+      ],
+    }));
+  }
+
+  function removeAllocationKeyRow(index: number) {
+    setUnitForm((current) => ({
+      ...current,
+      allocationKeys: current.allocationKeys.filter((_, rowIndex) => rowIndex !== index),
+    }));
   }
 
   function getLatestRent(unitId: string): { rent: number | null; prepayment: number | null } {
@@ -226,11 +278,11 @@ export default function PropertiesPage() {
           name: unitForm.name,
           floor: unitForm.floor,
           shares: unitForm.shares,
-          allocationKeys: parseAllocationKeys(unitForm.allocationKeysText),
+          allocationKeys: parseAllocationKeyRows(unitForm.allocationKeys),
         }),
       });
       if (res.ok) {
-        setUnitForm({ name: "", floor: "", shares: 0, allocationKeysText: "" });
+        setUnitForm({ name: "", floor: "", shares: 0, allocationKeys: [] });
         setShowNewUnitForm(null);
         await fetchPropertyDetail(propertyId);
         await fetchProperties();
@@ -250,12 +302,12 @@ export default function PropertiesPage() {
           name: unitForm.name,
           floor: unitForm.floor,
           shares: unitForm.shares,
-          allocationKeys: parseAllocationKeys(unitForm.allocationKeysText),
+          allocationKeys: parseAllocationKeyRows(unitForm.allocationKeys),
         }),
       });
       if (res.ok) {
         setEditingUnitId(null);
-        setUnitForm({ name: "", floor: "", shares: 0, allocationKeysText: "" });
+        setUnitForm({ name: "", floor: "", shares: 0, allocationKeys: [] });
         await fetchPropertyDetail(propertyId);
       }
     } catch (error) {
@@ -281,12 +333,83 @@ export default function PropertiesPage() {
       name: unit.name,
       floor: unit.floor,
       shares: unit.shares,
-      allocationKeysText: formatAllocationKeys(unit.allocationKeys),
+      allocationKeys: formatAllocationKeyRows(unit.allocationKeys),
     });
   }
 
   function getCurrentTenant(tenants: Tenant[]): Tenant | undefined {
     return tenants.find((t) => !t.moveOutDate);
+  }
+
+  function renderAllocationKeyRows() {
+    return (
+      <div className="mt-3">
+        <div className="mb-2 flex items-center justify-between gap-3">
+          <label className="block text-xs font-medium text-zinc-700">
+            Weitere Umlageschlüssel
+          </label>
+          <button
+            type="button"
+            onClick={addAllocationKeyRow}
+            className="rounded-lg border border-zinc-300 px-3 py-1.5 text-xs font-medium text-zinc-700 hover:bg-zinc-50"
+          >
+            Schlüssel hinzufügen
+          </button>
+        </div>
+        {unitForm.allocationKeys.length === 0 ? (
+          <p className="rounded-lg border border-dashed border-zinc-300 px-3 py-2 text-xs text-zinc-500">
+            Keine zusätzlichen Schlüssel hinterlegt.
+          </p>
+        ) : (
+          <div className="space-y-2">
+            {unitForm.allocationKeys.map((row, index) => (
+              <div
+                key={index}
+                className="grid gap-2 sm:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)_auto]"
+              >
+                <Combobox
+                  options={allocationKeyOptions}
+                  value={row.key}
+                  onChange={(key) => updateAllocationKeyRow(index, { key })}
+                  placeholder="Schlüssel wählen"
+                  searchPlaceholder="Schlüssel suchen..."
+                />
+                <input
+                  type="text"
+                  inputMode="decimal"
+                  value={row.unitValue}
+                  onChange={(e) =>
+                    updateAllocationKeyRow(index, { unitValue: e.target.value })
+                  }
+                  placeholder="Einzelanteil"
+                  className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+                />
+                <input
+                  type="text"
+                  inputMode="decimal"
+                  value={row.totalValue}
+                  onChange={(e) =>
+                    updateAllocationKeyRow(index, { totalValue: e.target.value })
+                  }
+                  placeholder="Gesamtanteil"
+                  className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+                />
+                <button
+                  type="button"
+                  onClick={() => removeAllocationKeyRow(index)}
+                  className="rounded-lg border border-zinc-300 px-3 py-2 text-xs font-medium text-zinc-700 hover:bg-zinc-50"
+                >
+                  Entfernen
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+        <p className="mt-1 text-xs text-zinc-500">
+          Die Auswahl muss zum Verteilerschlüssel der Kostenart passen.
+        </p>
+      </div>
+    );
   }
 
   return (
@@ -583,7 +706,7 @@ export default function PropertiesPage() {
                             name: "",
                             floor: "",
                             shares: 0,
-                            allocationKeysText: "",
+                            allocationKeys: [],
                           });
                         }}
                         className="rounded-lg border border-zinc-300 px-3 py-1.5 text-xs font-medium text-zinc-700 hover:bg-zinc-50"
@@ -653,26 +776,7 @@ export default function PropertiesPage() {
                             />
                           </div>
                         </div>
-                        <div className="mt-3">
-                          <label className="mb-1 block text-xs font-medium text-zinc-700">
-                            Weitere Umlageschlüssel
-                          </label>
-                          <textarea
-                            value={unitForm.allocationKeysText}
-                            onChange={(e) =>
-                              setUnitForm({
-                                ...unitForm,
-                                allocationKeysText: e.target.value,
-                              })
-                            }
-                            placeholder={"z.B.\nWohneinheiten: 1 / 71\nWohnfläche ab 1.OG - Aufzug (m2): 29,155 / 1824,378"}
-                            rows={3}
-                            className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
-                          />
-                          <p className="mt-1 text-xs text-zinc-500">
-                            Eine Zeile pro Schlüssel: Name: Einzelanteil / Gesamtanteil
-                          </p>
-                        </div>
+                        {renderAllocationKeyRows()}
                         <div className="mt-3 flex gap-2">
                           <button
                             type="submit"
@@ -773,23 +877,7 @@ export default function PropertiesPage() {
                                         />
                                       </div>
                                     </div>
-                                    <div className="mt-3">
-                                      <label className="mb-1 block text-xs font-medium text-zinc-700">
-                                        Weitere Umlageschlüssel
-                                      </label>
-                                      <textarea
-                                        value={unitForm.allocationKeysText}
-                                        onChange={(e) =>
-                                          setUnitForm({
-                                            ...unitForm,
-                                            allocationKeysText: e.target.value,
-                                          })
-                                        }
-                                        placeholder={"z.B.\nWohneinheiten: 1 / 71\nWohnfläche ab 1.OG - Aufzug (m2): 29,155 / 1824,378"}
-                                        rows={3}
-                                        className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
-                                      />
-                                    </div>
+                                    {renderAllocationKeyRows()}
                                     <div className="mt-3 flex gap-2">
                                         <button
                                           onClick={() =>
@@ -809,7 +897,7 @@ export default function PropertiesPage() {
                                               name: "",
                                               floor: "",
                                               shares: 0,
-                                              allocationKeysText: "",
+                                              allocationKeys: [],
                                             });
                                           }}
                                           className="rounded-lg border border-zinc-300 px-3 py-1.5 text-xs font-medium text-zinc-700 hover:bg-zinc-50"
