@@ -116,14 +116,14 @@ export function POST(request: Request) {
       prisma.pdfTemplate.deleteMany(),
       prisma.vpiEntry.deleteMany(),
       // Create parents first
-      ...(data.properties.length > 0
-        ? [prisma.property.createMany({ data: data.properties })]
-        : []),
       ...(data.costCategories.length > 0
         ? [prisma.costCategory.createMany({ data: data.costCategories })]
         : []),
       ...(data.landlordInfo.length > 0
         ? [prisma.landlordInfo.createMany({ data: data.landlordInfo })]
+        : []),
+      ...(data.properties.length > 0
+        ? [prisma.property.createMany({ data: data.properties })]
         : []),
       ...(data.units.length > 0
         ? [prisma.unit.createMany({ data: data.units })]

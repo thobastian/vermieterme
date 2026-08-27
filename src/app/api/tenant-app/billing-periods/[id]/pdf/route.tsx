@@ -21,7 +21,11 @@ export async function GET(
       include: {
         unit: {
           include: {
-            property: true,
+            property: {
+              include: {
+                landlord: true,
+              },
+            },
             allocationKeys: true,
           },
         },
@@ -61,7 +65,8 @@ export async function GET(
       );
     }
 
-    const landlord = await prisma.landlordInfo.findFirst();
+    const landlord =
+      tenant.unit.property.landlord ?? (await prisma.landlordInfo.findFirst());
     if (!landlord) {
       return new Response(
         JSON.stringify({ error: "Vermieterinformationen nicht konfiguriert" }),
@@ -86,15 +91,18 @@ export async function GET(
           (key) => key.key === distributionKey
         );
         const unitAmount =
-          distributionKey === "MEA"
-            ? calculateMEAAmount(cost.totalAmount, unit.shares, property.totalShares)
-            : allocationKey
-              ? calculateAllocationAmount(
-                  cost.totalAmount,
-                  allocationKey.unitValue,
-                  allocationKey.totalValue
-                )
-              : cost.unitAmount ?? 0;
+          property.accountingMode === "weg" &&
+          cost.tenantAmountOverride !== null
+            ? cost.tenantAmountOverride
+            : distributionKey === "MEA"
+              ? calculateMEAAmount(cost.totalAmount, unit.shares, property.totalShares)
+              : allocationKey
+                ? calculateAllocationAmount(
+                    cost.totalAmount,
+                    allocationKey.unitValue,
+                    allocationKey.totalValue
+                  )
+                : cost.unitAmount ?? 0;
 
         return {
           categoryName: cost.costCategory.name,

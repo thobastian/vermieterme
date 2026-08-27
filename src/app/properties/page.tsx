@@ -8,7 +8,7 @@ import { Loading } from "@/components/ui/loading";
 import { EmptyState } from "@/components/ui/empty-state";
 import { formatCurrency } from "@/lib/format";
 import { DISTRIBUTION_KEYS } from "@/lib/constants";
-import type { PropertyWithCount, PropertyWithUnits, UnitWithTenants, Tenant, RentChange, UnitAllocationKey, CostCategory } from "@/types";
+import type { PropertyWithCount, PropertyWithUnits, UnitWithTenants, Tenant, RentChange, UnitAllocationKey, CostCategory, LandlordInfo } from "@/types";
 
 type AllocationKeyFormRow = {
   key: string;
@@ -71,6 +71,7 @@ export default function PropertiesPage() {
   const [deleteUnitTarget, setDeleteUnitTarget] = useState<{ unitId: string; propertyId: string } | null>(null);
   const [rentChanges, setRentChanges] = useState<RentChange[]>([]);
   const [costCategories, setCostCategories] = useState<CostCategory[]>([]);
+  const [landlords, setLandlords] = useState<LandlordInfo[]>([]);
 
   // Property form state
   const [propertyForm, setPropertyForm] = useState({
@@ -78,6 +79,8 @@ export default function PropertiesPage() {
     zip: "",
     city: "",
     totalShares: 100,
+    landlordId: "",
+    accountingMode: "standard" as "standard" | "weg",
   });
 
   // Unit form state
@@ -92,6 +95,7 @@ export default function PropertiesPage() {
     fetchProperties();
     fetchRentChanges();
     fetchCostCategories();
+    fetchLandlords();
   }, []);
 
   async function fetchProperties() {
@@ -127,6 +131,38 @@ export default function PropertiesPage() {
     } catch (error) {
       console.error("Failed to fetch cost categories:", error);
     }
+  }
+
+  async function fetchLandlords() {
+    try {
+      const res = await fetch("/api/landlords");
+      if (res.ok) {
+        setLandlords(await res.json());
+      }
+    } catch (error) {
+      console.error("Failed to fetch landlords:", error);
+    }
+  }
+
+  const landlordOptions = [
+    { value: "", label: "Kein Vermieter zugeordnet" },
+    ...landlords
+      .filter((landlord) => landlord.id)
+      .map((landlord) => ({
+        value: landlord.id!,
+        label: landlord.name,
+      })),
+  ];
+
+  function resetPropertyForm() {
+    setPropertyForm({
+      street: "",
+      zip: "",
+      city: "",
+      totalShares: 100,
+      landlordId: "",
+      accountingMode: "standard",
+    });
   }
 
   const allocationKeyOptions = Array.from(
@@ -213,7 +249,7 @@ export default function PropertiesPage() {
         body: JSON.stringify(propertyForm),
       });
       if (res.ok) {
-        setPropertyForm({ street: "", zip: "", city: "", totalShares: 100 });
+        resetPropertyForm();
         setShowNewPropertyForm(false);
         await fetchProperties();
       }
@@ -231,7 +267,7 @@ export default function PropertiesPage() {
       });
       if (res.ok) {
         setEditingPropertyId(null);
-        setPropertyForm({ street: "", zip: "", city: "", totalShares: 100 });
+        resetPropertyForm();
         await fetchProperties();
         if (expandedId === id) {
           await fetchPropertyDetail(id);
@@ -264,6 +300,8 @@ export default function PropertiesPage() {
       zip: property.zip,
       city: property.city,
       totalShares: property.totalShares,
+      landlordId: property.landlordId ?? "",
+      accountingMode: property.accountingMode ?? "standard",
     });
   }
 
@@ -422,7 +460,7 @@ export default function PropertiesPage() {
             onClick={() => {
               setShowNewPropertyForm(!showNewPropertyForm);
               setEditingPropertyId(null);
-              setPropertyForm({ street: "", zip: "", city: "", totalShares: 100 });
+              resetPropertyForm();
             }}
             className="rounded-lg bg-red-700 px-4 py-2 text-sm font-medium text-white hover:bg-red-800"
           >
@@ -439,7 +477,7 @@ export default function PropertiesPage() {
             <h3 className="mb-4 text-lg font-semibold text-zinc-900">
               Neues Objekt anlegen
             </h3>
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-6">
               <div>
                 <label className="mb-1 block text-sm font-medium text-zinc-700">
                   Straße
@@ -499,6 +537,38 @@ export default function PropertiesPage() {
                   className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
                 />
               </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium text-zinc-700">
+                  Vermieter
+                </label>
+                <Combobox
+                  options={landlordOptions}
+                  value={propertyForm.landlordId}
+                  onChange={(landlordId) =>
+                    setPropertyForm({ ...propertyForm, landlordId })
+                  }
+                  placeholder="Vermieter wählen..."
+                  searchPlaceholder="Vermieter suchen..."
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium text-zinc-700">
+                  Modus
+                </label>
+                <select
+                  value={propertyForm.accountingMode}
+                  onChange={(e) =>
+                    setPropertyForm({
+                      ...propertyForm,
+                      accountingMode: e.target.value as "standard" | "weg",
+                    })
+                  }
+                  className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+                >
+                  <option value="standard">Standard</option>
+                  <option value="weg">ETW / WEG</option>
+                </select>
+              </div>
             </div>
             <div className="mt-4 flex gap-2">
               <button
@@ -535,7 +605,7 @@ export default function PropertiesPage() {
                     <h3 className="mb-4 text-lg font-semibold text-zinc-900">
                       Objekt bearbeiten
                     </h3>
-                    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-6">
                       <div>
                         <label className="mb-1 block text-sm font-medium text-zinc-700">
                           Straße
@@ -604,6 +674,40 @@ export default function PropertiesPage() {
                           className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
                         />
                       </div>
+                      <div>
+                        <label className="mb-1 block text-sm font-medium text-zinc-700">
+                          Vermieter
+                        </label>
+                        <Combobox
+                          options={landlordOptions}
+                          value={propertyForm.landlordId}
+                          onChange={(landlordId) =>
+                            setPropertyForm({ ...propertyForm, landlordId })
+                          }
+                          placeholder="Vermieter wählen..."
+                          searchPlaceholder="Vermieter suchen..."
+                        />
+                      </div>
+                      <div>
+                        <label className="mb-1 block text-sm font-medium text-zinc-700">
+                          Modus
+                        </label>
+                        <select
+                          value={propertyForm.accountingMode}
+                          onChange={(e) =>
+                            setPropertyForm({
+                              ...propertyForm,
+                              accountingMode: e.target.value as
+                                | "standard"
+                                | "weg",
+                            })
+                          }
+                          className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+                        >
+                          <option value="standard">Standard</option>
+                          <option value="weg">ETW / WEG</option>
+                        </select>
+                      </div>
                     </div>
                     <div className="mt-4 flex gap-2">
                       <button
@@ -615,12 +719,7 @@ export default function PropertiesPage() {
                       <button
                         onClick={() => {
                           setEditingPropertyId(null);
-                          setPropertyForm({
-                            street: "",
-                            zip: "",
-                            city: "",
-                            totalShares: 100,
-                          });
+                          resetPropertyForm();
                         }}
                         className="rounded-lg border border-zinc-300 px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50"
                       >
@@ -640,6 +739,18 @@ export default function PropertiesPage() {
                       <p className="text-sm text-zinc-500">
                         {property.zip} {property.city}
                       </p>
+                      <div className="mt-2 flex flex-wrap gap-2 text-xs">
+                        <span className="rounded bg-zinc-100 px-2 py-0.5 font-medium text-zinc-600">
+                          {property.accountingMode === "weg"
+                            ? "ETW / WEG"
+                            : "Standard"}
+                        </span>
+                        {property.landlord && (
+                          <span className="rounded bg-zinc-100 px-2 py-0.5 font-medium text-zinc-600">
+                            {property.landlord.name}
+                          </span>
+                        )}
+                      </div>
                     </div>
                     <div className="flex items-center gap-4">
                       <div className="text-right">

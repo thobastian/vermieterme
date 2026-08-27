@@ -11,6 +11,7 @@ export function GET(
     const property = await prisma.property.findUnique({
       where: { id },
       include: {
+        landlord: true,
         units: {
           include: {
             tenants: true,
@@ -38,7 +39,7 @@ export function PUT(
     await requireAuth();
     const { id } = await paramsPromise;
     const body = await request.json();
-    const { street, zip, city, totalShares } = body;
+    const { street, zip, city, totalShares, landlordId, accountingMode } = body;
 
     const property = await prisma.property.update({
       where: { id },
@@ -47,6 +48,8 @@ export function PUT(
         zip,
         city,
         totalShares,
+        landlordId: landlordId || null,
+        accountingMode: accountingMode || "standard",
       },
     });
 

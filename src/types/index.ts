@@ -2,6 +2,8 @@
 
 export interface Property {
   id: string;
+  landlordId: string | null;
+  accountingMode: "standard" | "weg";
   street: string;
   zip: string;
   city: string;
@@ -10,10 +12,12 @@ export interface Property {
 
 export interface PropertyWithCount extends Property {
   _count: { units: number };
+  landlord?: LandlordInfo | null;
 }
 
 export interface PropertyWithUnits extends Property {
   units: UnitWithTenants[];
+  landlord?: LandlordInfo | null;
 }
 
 // === Unit ===
@@ -102,6 +106,8 @@ export interface Cost {
   costCategoryId: string;
   totalAmount: number;
   unitAmount: number | null;
+  ownerAmount: number | null;
+  tenantAmountOverride: number | null;
   reviewed: boolean;
   enabled: boolean;
   distributionKeyOverride: string | null;

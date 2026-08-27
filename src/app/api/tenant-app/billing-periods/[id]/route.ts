@@ -58,7 +58,11 @@ export function GET(
       // Per-period override takes precedence over the category default.
       const distributionKey =
         cost.distributionKeyOverride ?? cost.costCategory.distributionKey;
-      let unitAmount = cost.unitAmount;
+      let unitAmount =
+        property.accountingMode === "weg" &&
+        cost.tenantAmountOverride !== null
+          ? cost.tenantAmountOverride
+          : cost.unitAmount;
       if (unitAmount == null && distributionKey.toLowerCase() === "mea") {
         unitAmount = calculateMEAAmount(cost.totalAmount, unit.shares, property.totalShares);
       } else if (

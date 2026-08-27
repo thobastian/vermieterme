@@ -38,6 +38,7 @@ export async function GET(
       include: {
         property: {
           include: {
+            landlord: true,
             units: {
               include: {
                 tenants: true,
@@ -71,7 +72,8 @@ export async function GET(
       );
     }
 
-    const landlord = await prisma.landlordInfo.findFirst();
+    const landlord =
+      billingPeriod.property.landlord ?? (await prisma.landlordInfo.findFirst());
 
     if (!landlord) {
       return new Response(
@@ -126,6 +128,7 @@ export async function GET(
           };
           totalAmount: number;
           unitAmount: number | null;
+          tenantAmountOverride: number | null;
           distributionKeyOverride: string | null;
         }) => {
           const distributionKey =
@@ -134,19 +137,22 @@ export async function GET(
             (key: { key: string }) => key.key === distributionKey
           );
           const unitAmount =
-            distributionKey === "MEA"
-              ? calculateMEAAmount(
-                  cost.totalAmount,
-                  targetUnit.shares,
-                  property.totalShares
-                )
-              : allocationKey
-                ? calculateAllocationAmount(
+            property.accountingMode === "weg" &&
+            cost.tenantAmountOverride !== null
+              ? cost.tenantAmountOverride
+              : distributionKey === "MEA"
+                ? calculateMEAAmount(
                     cost.totalAmount,
-                    allocationKey.unitValue,
-                    allocationKey.totalValue
+                    targetUnit.shares,
+                    property.totalShares
                   )
-                : cost.unitAmount ?? 0;
+                : allocationKey
+                  ? calculateAllocationAmount(
+                      cost.totalAmount,
+                      allocationKey.unitValue,
+                      allocationKey.totalValue
+                    )
+                  : cost.unitAmount ?? 0;
 
           return {
             categoryName: cost.costCategory.name,

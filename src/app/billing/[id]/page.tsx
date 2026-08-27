@@ -38,6 +38,8 @@ interface NkSuggestionTarget {
 interface CostFormValue {
   totalAmount: string;
   unitAmount: string;
+  ownerAmount: string;
+  tenantAmountOverride: string;
   enabled: boolean;
   distributionKeyOverride: string | null;
 }
@@ -45,6 +47,8 @@ interface CostFormValue {
 const DEFAULT_COST_VALUE: CostFormValue = {
   totalAmount: "",
   unitAmount: "",
+  ownerAmount: "",
+  tenantAmountOverride: "",
   enabled: true,
   distributionKeyOverride: null,
 };
@@ -92,6 +96,8 @@ export default function BillingDetailPage() {
           costs[cost.costCategoryId] = {
             totalAmount: cost.totalAmount.toString(),
             unitAmount: cost.unitAmount?.toString() || "",
+            ownerAmount: cost.ownerAmount?.toString() || "",
+            tenantAmountOverride: cost.tenantAmountOverride?.toString() || "",
             enabled: cost.enabled !== false,
             distributionKeyOverride: cost.distributionKeyOverride ?? null,
           };
@@ -133,7 +139,7 @@ export default function BillingDetailPage() {
 
   function handleCostChange(
     categoryId: string,
-    field: "totalAmount" | "unitAmount",
+    field: "totalAmount" | "unitAmount" | "ownerAmount" | "tenantAmountOverride",
     value: string
   ) {
     setCostValues((prev) => ({
@@ -216,6 +222,10 @@ export default function BillingDetailPage() {
               costCategoryId: categoryId,
               totalAmount: parseFloat(val.totalAmount) || 0,
               unitAmount: val.unitAmount ? parseFloat(val.unitAmount) : null,
+              ownerAmount: val.ownerAmount ? parseFloat(val.ownerAmount) : null,
+              tenantAmountOverride: val.tenantAmountOverride
+                ? parseFloat(val.tenantAmountOverride)
+                : null,
             }),
           })
         );
@@ -281,6 +291,10 @@ export default function BillingDetailPage() {
           costCategoryId,
           totalAmount: parseFloat(costVal.totalAmount) || 0,
           unitAmount: costVal.unitAmount ? parseFloat(costVal.unitAmount) : null,
+          ownerAmount: costVal.ownerAmount ? parseFloat(costVal.ownerAmount) : null,
+          tenantAmountOverride: costVal.tenantAmountOverride
+            ? parseFloat(costVal.tenantAmountOverride)
+            : null,
           reviewed: true,
         }),
       });
@@ -348,6 +362,14 @@ export default function BillingDetailPage() {
       if (cat.apportionable === false) return;
       const totalAmount = parseFloat(costVal.totalAmount) || 0;
       const effectiveKey = costVal.distributionKeyOverride ?? cat.distributionKey;
+      const tenantAmountOverride = costVal.tenantAmountOverride
+        ? parseFloat(costVal.tenantAmountOverride)
+        : null;
+
+      if (tenantAmountOverride !== null && billingPeriod!.property.accountingMode === "weg") {
+        total += tenantAmountOverride;
+        return;
+      }
 
       if (effectiveKey === "MEA") {
         total += calculateMEAAmount(totalAmount, unit.shares, billingPeriod!.property.totalShares);
@@ -437,6 +459,7 @@ export default function BillingDetailPage() {
   );
   const monthsInPeriod = getMonthsInPeriod(billingPeriod.startDate, billingPeriod.endDate);
   const daysInPeriod = getDaysInPeriod(billingPeriod.startDate, billingPeriod.endDate);
+  const isWegMode = property.accountingMode === "weg";
 
   // Disabled cost positions are excluded from review tracking — they aren't
   // part of this period's calculation, so they shouldn't show as "ungeprüft".
@@ -627,9 +650,18 @@ export default function BillingDetailPage() {
                     const needsUnitAmount =
                       effectiveKey === "laut Bescheid" ||
                       effectiveKey === "siehe Anlage";
+                    const tenantAmountOverride = costVal.tenantAmountOverride
+                      ? parseFloat(costVal.tenantAmountOverride)
+                      : null;
 
                     let calculatedDisplay = "";
-                    if (apportionable && costVal.totalAmount && units.length > 0) {
+                    if (
+                      apportionable &&
+                      isWegMode &&
+                      tenantAmountOverride !== null
+                    ) {
+                      calculatedDisplay = formatCurrency(tenantAmountOverride);
+                    } else if (apportionable && costVal.totalAmount && units.length > 0) {
                       const amounts = units.map(
                         (u) => {
                           const totalAmount =
@@ -764,26 +796,78 @@ export default function BillingDetailPage() {
                           )}
                         </td>
                         <td className="px-4 py-3 text-right">
-                          <div className="flex justify-end">
-                            <input
-                              type="number"
-                              step="0.01"
-                              value={costVal.totalAmount}
-                              disabled={!enabled}
-                              onChange={(e) =>
-                                handleCostChange(
-                                  cat.id,
-                                  "totalAmount",
-                                  e.target.value
-                                )
-                              }
-                              placeholder="0,00"
-                              className="w-32 rounded-lg border border-zinc-300 px-3 py-2 text-right text-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 disabled:bg-zinc-100 disabled:text-zinc-400"
-                            />
+                          <div className="space-y-2">
+                            <div className="flex justify-end">
+                              <input
+                                type="number"
+                                step="0.01"
+                                value={costVal.totalAmount}
+                                disabled={!enabled}
+                                onChange={(e) =>
+                                  handleCostChange(
+                                    cat.id,
+                                    "totalAmount",
+                                    e.target.value
+                                  )
+                                }
+                                placeholder="0,00"
+                                className="w-32 rounded-lg border border-zinc-300 px-3 py-2 text-right text-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 disabled:bg-zinc-100 disabled:text-zinc-400"
+                              />
+                            </div>
+                            {isWegMode && (
+                              <div>
+                                <label className="mb-1 block text-right text-xs text-zinc-500">
+                                  Ihr Anteil
+                                </label>
+                                <div className="flex justify-end">
+                                  <input
+                                    type="number"
+                                    step="0.01"
+                                    value={costVal.ownerAmount}
+                                    disabled={!enabled}
+                                    onChange={(e) =>
+                                      handleCostChange(
+                                        cat.id,
+                                        "ownerAmount",
+                                        e.target.value
+                                      )
+                                    }
+                                    placeholder="0,00"
+                                    className="w-32 rounded-lg border border-zinc-300 px-3 py-2 text-right text-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 disabled:bg-zinc-100 disabled:text-zinc-400"
+                                  />
+                                </div>
+                              </div>
+                            )}
                           </div>
                         </td>
                         <td className="px-4 py-3 text-right">
-                          {!apportionable ? (
+                          {isWegMode && apportionable ? (
+                            <div className="space-y-2">
+                              <label className="block text-right text-xs text-zinc-500">
+                                davon umlagefähig
+                              </label>
+                              <div className="flex justify-end">
+                                <input
+                                  type="number"
+                                  step="0.01"
+                                  value={costVal.tenantAmountOverride}
+                                  disabled={!enabled}
+                                  onChange={(e) =>
+                                    handleCostChange(
+                                      cat.id,
+                                      "tenantAmountOverride",
+                                      e.target.value
+                                    )
+                                  }
+                                  placeholder="automatisch"
+                                  className="w-32 rounded-lg border border-zinc-300 px-3 py-2 text-right text-sm focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 disabled:bg-zinc-100 disabled:text-zinc-400"
+                                />
+                              </div>
+                              <div className="text-sm text-zinc-500">
+                                {calculatedDisplay || "Automatisch"}
+                              </div>
+                            </div>
+                          ) : !apportionable ? (
                             <div className="text-sm text-zinc-400">
                               Nicht berechnet
                             </div>
